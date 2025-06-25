@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "EEG TXT Reader",
+  "version": "1.0",
+  "description": "Read and display .txt EEG files",
+  "action": {
+    "default_popup": "index.html"
+  },
+  "permissions": ["storage"]
+}
