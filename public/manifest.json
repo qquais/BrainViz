@@ -2,9 +2,23 @@
   "manifest_version": 3,
   "name": "EEG TXT Reader",
   "version": "1.0",
-  "description": "Read and display .txt EEG files",
+  "description": "Read, extract, and visualize EEG signals from .txt or .zip files",
   "action": {
-    "default_popup": "index.html"
+    "default_popup": "index.html",
+    "default_icon": {
+      "128": "favicon.png"
+    }
   },
-  "permissions": ["storage"]
+  "permissions": [
+    "storage"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "libs/plotly.min.js",
+        "libs/jszip.min.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

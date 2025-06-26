@@ -7,10 +7,19 @@
 </head>
 <body>
   <div class="container">
-    <h2>EEG .txt File Reader</h2>
-    <input type="file" id="fileInput" accept=".txt" />
-    <pre id="output"></pre>
+    <h2>EEG .txt/.zip File Reader</h2>
+    <input type="file" id="fileInput" accept=".txt,.zip" />
+
+    <pre id="output" style="display: none;"></pre>
+
+    <!-- EEG Chart -->
+    <div id="chart" style="width:100%;height:400px;margin-top:20px;"></div>
   </div>
+
+  <!-- JS Libraries -->
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script> -->
+  <script src="libs/jszip.min.js"></script>
+  <script src="libs/plotly.min.js"></script>
   <script type="module" src="main.js"></script>
 </body>
 </html>
