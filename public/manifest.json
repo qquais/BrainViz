@@ -4,19 +4,22 @@
   "version": "1.0",
   "description": "Read, extract, and visualize EEG signals from .txt or .zip files",
   "action": {
-    "default_popup": "index.html",
-    "default_icon": {
-      "128": "favicon.png"
-    }
+    "default_popup": "index.html"
   },
   "permissions": [
-    "storage"
+    "storage",
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "web_accessible_resources": [
     {
       "resources": [
         "libs/plotly.min.js",
-        "libs/jszip.min.js"
+        "libs/jszip.min.js",
+        "viewer.html"
       ],
       "matches": ["<all_urls>"]
     }
