@@ -1,27 +1,32 @@
 {
   "manifest_version": 3,
   "name": "EEG TXT Reader",
-  "version": "1.0",
-  "description": "Read, extract, and visualize EEG signals from .txt or .zip files",
-  "action": {
-    "default_popup": "index.html"
-  },
-  "permissions": [
-    "storage",
-    "tabs",
-    "scripting"
-  ],
+  "version": "1.2",
+  "description": "Read and visualize EEG signals from .txt files with download interception",
+  "permissions": ["storage", "tabs", "downloads"],
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "*://physionet.org/*",
+    "*://*.physionet.org/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
   ],
   "web_accessible_resources": [
     {
-      "resources": [
-        "libs/plotly.min.js",
-        "libs/jszip.min.js",
-        "viewer.html"
-      ],
+      "resources": ["libs/plotly.min.js", "viewer.html", "scriptInjector.js"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "EEG Reader"
+  }
 }
