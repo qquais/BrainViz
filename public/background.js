@@ -1,6 +1,25 @@
+/**
+ * Enhanced background service worker for EEG file download interception
+ * Handles download monitoring, file validation, and viewer integration
+ * 
+ * @fileoverview Background script that intercepts EEG file downloads and opens them in a visualizer
+ * @author EEG Reader Extension
+ * @version 1.4
+ */
+
 console.log("🚀 Background script loaded");
 
-// More selective EEG file detection for downloads
+/**
+ * Determines if a download URL represents an EEG file that should be intercepted
+ * Uses multiple heuristics to avoid intercepting non-EEG files
+ * 
+ * @param {string} url - The download URL to analyze
+ * @returns {boolean} True if the URL should be intercepted as an EEG file
+ * 
+ * @example
+ * isEEGDownload('https://physionet.org/files/data/eeg_signal.txt') // true
+ * isEEGDownload('https://example.com/readme.txt') // false
+ */
 function isEEGDownload(url) {
   if (!url) return false;
   
@@ -64,7 +83,12 @@ function isEEGDownload(url) {
   return false;
 }
 
-// Download interception
+/**
+ * Chrome downloads event listener
+ * Monitors all downloads and intercepts EEG files when interception is enabled
+ * 
+ * @listens chrome.downloads.onCreated
+ */
 chrome.downloads.onCreated.addListener((downloadItem) => {
   console.log("📥 Download detected:", downloadItem.url, downloadItem.filename);
   
@@ -89,6 +113,15 @@ chrome.downloads.onCreated.addListener((downloadItem) => {
   }
 });
 
+/**
+ * Fetches an intercepted EEG file and opens it in the viewer
+ * Validates content to ensure it's actually EEG data, not HTML
+ * 
+ * @param {string} url - The URL of the EEG file to fetch and process
+ * @returns {Promise<void>} Resolves when file is processed or error occurs
+ * 
+ * @throws {Error} When fetch fails or content validation fails
+ */
 async function handleDownload(url) {
   console.log("📡 Fetching intercepted file:", url);
   try {
@@ -122,7 +155,16 @@ async function handleDownload(url) {
   }
 }
 
-// Handle messages
+/**
+ * Message handler for communication with popup and content scripts
+ * Handles viewer opening, intercept toggling, and state queries
+ * 
+ * @listens chrome.runtime.onMessage
+ * @param {Object} msg - Message object with action property
+ * @param {chrome.runtime.MessageSender} sender - Message sender info
+ * @param {Function} sendResponse - Response callback function
+ * @returns {boolean} True for async responses
+ */
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   console.log("📨 Message received:", msg.action);
   
@@ -150,7 +192,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
-// Initialize
+/**
+ * Extension installation handler
+ * Sets up default configuration when extension is first installed
+ * 
+ * @listens chrome.runtime.onInstalled
+ */
 chrome.runtime.onInstalled.addListener(() => {
   console.log("🧠 EEG Reader installed");
   chrome.storage.local.set({ interceptEnabled: true }, () => {

@@ -1,6 +1,25 @@
+/**
+ * Content script for EEG file interception on web pages
+ * Injects page scripts and handles EEG file processing requests
+ * 
+ * @fileoverview Content script that bridges page context and extension context for EEG file handling
+ * @author EEG Reader Extension
+ * @version 1.4
+ */
+
 console.log("🔧 EEG Content script starting on:", window.location.href);
 
-// Function to check if extension context is valid
+/**
+ * Validates that the Chrome extension context is still available
+ * Used to prevent errors when extension is reloaded or disabled
+ * 
+ * @returns {boolean} True if extension context is valid and accessible
+ * 
+ * @example
+ * if (isExtensionContextValid()) {
+ *   // Safe to use chrome.* APIs
+ * }
+ */
 function isExtensionContextValid() {
   try {
     return chrome?.runtime?.id !== undefined;
@@ -9,7 +28,14 @@ function isExtensionContextValid() {
   }
 }
 
-// Wait for page to be ready
+/**
+ * Initializes the EEG interceptor system on the current page
+ * Sets up script injection and message handling for EEG file interception
+ * 
+ * @returns {void}
+ * 
+ * @throws {Error} When extension context is invalid
+ */
 function initializeEEGInterceptor() {
   console.log("🔧 Initializing EEG interceptor...");
   
@@ -36,8 +62,16 @@ function initializeEEGInterceptor() {
   // Track processed messages to prevent duplicates
   const processedMessages = new Set();
 
-  // Listen for EEG file messages from page
+  /**
+   * Handles EEG file interception messages from the injected page script
+   * Processes the URL, validates content, and opens the EEG viewer
+   * 
+   * @listens window.message
+   * @param {MessageEvent} event - The message event from the page
+   * @returns {Promise<void>} Resolves when processing is complete
+   */
   window.addEventListener("message", async (event) => {
+    // Filter for our specific message type
     if (event.source !== window || event.data.type !== "EEG_INTERCEPT") return;
 
     const href = event.data.href;

@@ -1,3 +1,12 @@
+/**
+ * Page-injected script for EEG file link detection and interception
+ * Runs in the page context to monitor link clicks and identify EEG files
+ * 
+ * @fileoverview Injected script that detects EEG file links and sends interception messages
+ * @author EEG Reader Extension
+ * @version 1.4
+ */
+
 console.log("🔧 Script injector loaded on:", window.location.hostname);
 
 // Prevent multiple initialization
@@ -9,7 +18,18 @@ if (window.eegInterceptorInitialized) {
   // Track processed clicks to prevent duplicates
   const processedClicks = new Set();
 
-  // Enhanced EEG file detection
+  /**
+   * Analyzes a URL to determine if it represents an EEG file that should be intercepted
+   * Uses multiple heuristics including file extensions, URL patterns, and content indicators
+   * 
+   * @param {string} url - The URL to analyze for EEG file characteristics  
+   * @returns {boolean} True if the URL should be intercepted as an EEG file
+   * 
+   * @example
+   * isEEGFile('https://physionet.org/files/data.txt') // true
+   * isEEGFile('https://physionet.org/content/dataset/page.txt') // false (content page)
+   * isEEGFile('https://example.com/data.txt?download=1') // true (has download param)
+   */
   function isEEGFile(url) {
     if (!url) return false;
     
@@ -44,7 +64,15 @@ if (window.eegInterceptorInitialized) {
     return isEEG;
   }
 
-  // Single unified click handler
+  /**
+   * Handles link click events to detect and intercept EEG file downloads
+   * Prevents default behavior for EEG files and sends interception message
+   * 
+   * @param {MouseEvent} e - The click event on a link element
+   * @returns {boolean|void} False if event was intercepted, void otherwise
+   * 
+   * @listens document.click
+   */
   function handleLinkClick(e) {
     const link = e.target.closest('a');
     if (!link) return;

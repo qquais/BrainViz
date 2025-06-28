@@ -13,7 +13,7 @@
  * Initializes the EEG viewer when the DOM is loaded
  * Retrieves stored EEG data and begins the visualization process
  * 
- * @listens document.DOMContentLoaded
+ * @listens document.DOMContentLoadedgit 
  * @returns {void}
  */
 document.addEventListener('DOMContentLoaded', () => {
