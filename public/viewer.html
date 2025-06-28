@@ -1,16 +1,86 @@
 <!DOCTYPE html>
+<!--
+  EEG Data Visualization Viewer
+  
+  This HTML file creates the full-screen EEG data visualization interface.
+  It opens in a new tab when EEG files are intercepted or manually uploaded.
+  
+  Features:
+  - Full viewport plotting area using Plotly.js
+  - Interactive charts with zoom, pan, and hover capabilities
+  - Responsive design that adapts to any screen size
+  - Error handling with user-friendly messages
+  
+  Data Flow:
+  1. Extension stores EEG data in chrome.storage.local
+  2. This page loads and retrieves the stored data
+  3. viewer.js processes and visualizes the data
+  4. Plotly.js renders interactive charts
+  
+  Dependencies:
+  - plotly.min.js (interactive charting library)
+  - viewer.js (data processing and visualization logic)
+  - Chrome Extension Storage API
+  
+  Version: 1.4
+  Author: EEG Reader Extension Team
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>EEG Plot Viewer</title>
+  
+  <!-- 
+    Plotly.js - Interactive charting library
+    Used for creating interactive, zoomable EEG signal plots
+    Features: zoom, pan, hover tooltips, responsive design
+  -->
   <script src="libs/plotly.min.js"></script>
+  
+  <!--
+    Minimal CSS for full-screen plotting experience
+    Removes all margins and padding to maximize plot area
+  -->
   <style>
-    body { margin: 0; font-family: Arial, sans-serif; }
-    #plot { width: 100vw; height: 100vh; }
+    /* 
+      Remove all default browser styling for clean full-screen experience
+      Sets up the page for a complete plotting interface
+    */
+    body { 
+      margin: 0;                    /* Remove default browser margins */
+      font-family: Arial, sans-serif; /* Consistent font for any text elements */
+    }
+    
+    /*
+      Plot container takes up entire viewport
+      This ensures the EEG visualization uses maximum screen real estate
+    */
+    #plot { 
+      width: 100vw;   /* Full viewport width */
+      height: 100vh;  /* Full viewport height */
+    }
   </style>
 </head>
 <body>
+  <!--
+    Main plot container
+    This div will be replaced by Plotly with the interactive chart
+    Shows loading message until data is processed
+    
+    The viewer.js script will either:
+    - Replace this with an interactive Plotly chart, OR
+    - Replace this with an error message if data is invalid
+  -->
   <div id="plot">Loading...</div>
+
+  <!--
+    Main visualization script
+    Handles:
+    - Retrieving EEG data from extension storage
+    - Parsing CSV/TSV data formats
+    - Creating interactive Plotly visualizations
+    - Error handling and user feedback
+  -->
   <script src="viewer.js"></script>
 </body>
 </html>
