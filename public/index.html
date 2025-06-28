@@ -1,139 +1,214 @@
 <!DOCTYPE html>
+<!--
+  EEG Reader Extension - Popup Control Panel
+  
+  This HTML file creates the user interface for the extension's popup window.
+  The popup appears when users click the extension icon in the Chrome toolbar.
+  
+  Features:
+  - Toggle switch for download interception
+  - Manual file upload area for .txt files
+  - Clear data button for stored EEG data
+  - Responsive design with hover effects
+  
+  Dependencies:
+  - popup.js (main popup functionality)
+  - Chrome Extension APIs (storage, tabs, runtime)
+  
+  Version: 1.4
+  Author: EEG Reader Extension Team
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>EEG Reader Control Panel</title>
+  
+  <!-- 
+    Custom CSS for popup interface
+    Creates a clean, modern interface with:
+    - Toggle switches with smooth animations
+    - Drag-and-drop style file upload area
+    - Consistent button styling
+    - Responsive layout for different screen sizes
+  -->
   <style>
+    /* Main container styling - sets popup dimensions and background */
     body {
-      width: 300px;
-      padding: 15px;
+      width: 300px;           /* Fixed width for consistent popup size */
+      padding: 15px;          /* Outer padding for content breathing room */
       font-family: Arial, sans-serif;
-      background: #f5f5f5;
-      margin: 0;
+      background: #f5f5f5;    /* Light gray background */
+      margin: 0;              /* Remove default browser margins */
     }
+    
+    /* Inner content container with card-like appearance */
     .container {
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      background: white;      /* White card background */
+      padding: 20px;          /* Internal padding for content */
+      border-radius: 8px;     /* Rounded corners for modern look */
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* Subtle shadow for depth */
     }
+    
+    /* Main heading styling */
     h2 {
-      margin: 0 0 15px 0;
-      color: #333;
-      font-size: 18px;
+      margin: 0 0 15px 0;     /* Remove default margins, add bottom spacing */
+      color: #333;            /* Dark gray text color */
+      font-size: 18px;        /* Readable font size */
     }
+    
+    /* Control group containers - separate different UI sections */
     .control-group {
-      margin-bottom: 15px;
-      padding-bottom: 15px;
-      border-bottom: 1px solid #eee;
+      margin-bottom: 15px;    /* Space between control sections */
+      padding-bottom: 15px;   /* Internal bottom padding */
+      border-bottom: 1px solid #eee; /* Subtle separator line */
     }
+    
+    /* Remove border from last control group for clean appearance */
     .control-group:last-child {
       border-bottom: none;
       margin-bottom: 0;
     }
+    
+    /* Container for toggle switch and label */
     .toggle-container {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 10px;
+      display: flex;          /* Flexbox for easy alignment */
+      align-items: center;    /* Vertically center items */
+      justify-content: space-between; /* Space between label and toggle */
+      margin-bottom: 10px;    /* Space below toggle row */
     }
+    
+    /* Custom toggle switch styling */
     .toggle-switch {
-      position: relative;
-      width: 50px;
-      height: 24px;
-      background: #ccc;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: background 0.3s;
+      position: relative;     /* For absolute positioning of knob */
+      width: 50px;           /* Switch track width */
+      height: 24px;          /* Switch track height */
+      background: #ccc;      /* Default gray background */
+      border-radius: 12px;   /* Rounded ends for pill shape */
+      cursor: pointer;       /* Show clickable cursor */
+      transition: background 0.3s; /* Smooth color transition */
     }
+    
+    /* Active state for toggle switch - green when enabled */
     .toggle-switch.active {
-      background: #4CAF50;
+      background: #4CAF50;   /* Green background when active */
     }
+    
+    /* Toggle switch knob (the sliding circle) */
     .toggle-knob {
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 20px;
-      height: 20px;
-      background: white;
-      border-radius: 50%;
-      transition: transform 0.3s;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      position: absolute;    /* Absolute positioning within switch */
+      top: 2px;             /* Slight top offset for visual balance */
+      left: 2px;            /* Default left position */
+      width: 20px;          /* Knob diameter */
+      height: 20px;         /* Knob diameter */
+      background: white;     /* White knob color */
+      border-radius: 50%;    /* Perfect circle */
+      transition: transform 0.3s; /* Smooth sliding animation */
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2); /* Shadow for depth */
     }
+    
+    /* Knob position when toggle is active - slides to right */
     .toggle-switch.active .toggle-knob {
-      transform: translateX(26px);
+      transform: translateX(26px); /* Move right when active */
     }
+    
+    /* Status text styling */
     .status {
-      font-size: 12px;
-      color: #666;
-      margin-top: 5px;
+      font-size: 12px;       /* Smaller text for status info */
+      color: #666;           /* Gray text color */
+      margin-top: 5px;       /* Space above status text */
     }
+    
+    /* File upload drop area styling */
     .file-input-area {
-      border: 2px dashed #ddd;
-      border-radius: 6px;
-      padding: 20px;
-      text-align: center;
-      background: #fafafa;
-      cursor: pointer;
-      transition: border-color 0.3s;
+      border: 2px dashed #ddd;    /* Dashed border for drop zone feel */
+      border-radius: 6px;         /* Rounded corners */
+      padding: 20px;              /* Generous padding for click target */
+      text-align: center;         /* Center the upload text */
+      background: #fafafa;        /* Very light gray background */
+      cursor: pointer;            /* Show clickable cursor */
+      transition: border-color 0.3s; /* Smooth border color change */
     }
+    
+    /* Hover effect for file upload area */
     .file-input-area:hover {
-      border-color: #4CAF50;
+      border-color: #4CAF50;      /* Green border on hover */
     }
+    
+    /* Hide the actual file input (replaced by custom upload area) */
     #fileInput {
       display: none;
     }
+    
+    /* Upload area text styling */
     .upload-text {
-      color: #666;
-      font-size: 14px;
+      color: #666;           /* Gray text color */
+      font-size: 14px;       /* Readable font size */
     }
+    
+    /* Button styling for consistent appearance */
     .btn {
-      background: #4CAF50;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-      margin-top: 10px;
-      width: 100%;
+      background: #4CAF50;   /* Green background */
+      color: white;          /* White text */
+      border: none;          /* Remove default border */
+      padding: 8px 16px;     /* Comfortable padding */
+      border-radius: 4px;    /* Slightly rounded corners */
+      cursor: pointer;       /* Show clickable cursor */
+      font-size: 12px;       /* Readable font size */
+      margin-top: 10px;      /* Space above button */
+      width: 100%;           /* Full width within container */
     }
+    
+    /* Button hover effect */
     .btn:hover {
-      background: #45a049;
+      background: #45a049;   /* Darker green on hover */
     }
+    
+    /* Info text styling for help text and descriptions */
     .info {
-      font-size: 11px;
-      color: #888;
-      margin-top: 8px;
-      line-height: 1.4;
+      font-size: 11px;       /* Small font for secondary info */
+      color: #888;           /* Light gray text */
+      margin-top: 8px;       /* Space above info text */
+      line-height: 1.4;      /* Comfortable line spacing */
     }
   </style>
 </head>
 <body>
+  <!-- Main container for all popup content -->
   <div class="container">
+    <!-- Popup title with brain emoji for visual appeal -->
     <h2>🧠 EEG Reader</h2>
     
+    <!-- Control group for download interception toggle -->
     <div class="control-group">
+      <!-- Toggle switch container with label and switch -->
       <div class="toggle-container">
         <span>Auto-intercept downloads</span>
+        <!-- Custom toggle switch with animated knob -->
         <div class="toggle-switch" id="interceptToggle">
           <div class="toggle-knob"></div>
         </div>
       </div>
+      <!-- Status text showing current intercept state -->
       <div class="status" id="interceptStatus">Loading...</div>
+      <!-- Help text explaining the feature -->
       <div class="info">When enabled, .txt and .zip EEG files will open in the visualizer instead of downloading</div>
     </div>
 
+    <!-- Control group for manual file upload -->
     <div class="control-group">
+      <!-- File upload area that triggers hidden file input -->
       <div class="file-input-area" id="fileInputArea">
         <div class="upload-text">📁 Click to select EEG .txt file</div>
         <div class="info">Supports .txt files (use download interception for .zip files)</div>
       </div>
+      <!-- Hidden file input element (triggered by clicking upload area) -->
       <input type="file" id="fileInput" accept=".txt" />
+      <!-- Button to clear stored EEG data -->
       <button class="btn" id="clearDataBtn">Clear stored data</button>
     </div>
   </div>
 
+  <!-- JavaScript file that handles all popup functionality -->
   <script src="popup.js"></script>
 </body>
 </html>
