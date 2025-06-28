@@ -1,65 +1,85 @@
-// Enhanced scriptInjector.js for PhysioNet compatibility
-
 console.log("🔧 Script injector loaded on:", window.location.hostname);
 
-document.addEventListener('click', function(e) {
-  const link = e.target.closest('a');
-  if (!link) return;
+// Prevent multiple initialization
+if (window.eegInterceptorInitialized) {
+  console.log("⚠️ EEG interceptor already initialized, skipping");
+} else {
+  window.eegInterceptorInitialized = true;
 
-  const href = link.href || '';
-  const isEEG = href.endsWith('.txt') || href.endsWith('.zip');
+  // Track processed clicks to prevent duplicates
+  const processedClicks = new Set();
 
-  console.log("🔍 Link clicked:", href, "isEEG:", isEEG);
-
-  if (isEEG) {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log("🧠 Intercepted link click:", href);
-    window.postMessage({ type: "EEG_INTERCEPT", href }, "*");
-    return false;
-  }
-});
-
-// Also intercept download buttons and file links
-document.addEventListener('click', function(e) {
-  // Check if clicked element or parent has download attribute
-  let element = e.target;
-  for (let i = 0; i < 3; i++) { // Check up to 3 levels up
-    if (!element) break;
+  // Enhanced EEG file detection
+  function isEEGFile(url) {
+    if (!url) return false;
     
-    if (element.tagName === 'A' || element.hasAttribute('download')) {
-      const href = element.href || element.getAttribute('href') || '';
-      const isEEG = href.endsWith('.txt') || href.endsWith('.zip');
-      
-      if (isEEG) {
-        console.log("🧠 Intercepted download button:", href);
-        e.preventDefault();
-        e.stopPropagation();
-        window.postMessage({ type: "EEG_INTERCEPT", href }, "*");
-        return false;
-      }
-    }
-    element = element.parentElement;
-  }
-}, true); // Use capture phase
-
-// Special handling for PhysioNet
-if (window.location.hostname.includes('physionet')) {
-  console.log("🏥 PhysioNet detected, adding special handlers");
-  
-  // Watch for dynamically created download links
-  const observer = new MutationObserver(function(mutations) {
-    mutations.forEach(function(mutation) {
-      mutation.addedNodes.forEach(function(node) {
-        if (node.nodeType === 1) { // Element node
-          const links = node.querySelectorAll ? node.querySelectorAll('a[href$=".txt"], a[href$=".zip"]') : [];
-          links.forEach(link => {
-            console.log("🔍 Found dynamic EEG link:", link.href);
-          });
-        }
-      });
+    // Remove query parameters for checking
+    const urlWithoutParams = url.split('?')[0];
+    const hasEEGExtension = urlWithoutParams.endsWith('.txt') || 
+                           urlWithoutParams.endsWith('.zip') || 
+                           urlWithoutParams.endsWith('.edf') ||
+                           urlWithoutParams.endsWith('.csv');
+    
+    // Also check if URL contains EEG-related patterns
+    const hasEEGPattern = url.includes('.txt') || 
+                         url.includes('.zip') || 
+                         url.includes('eeg') ||
+                         url.includes('EEG') ||
+                         url.includes('RECORDS');
+    
+    // Check for download parameter (PhysioNet style)
+    const hasDownloadParam = url.includes('?download') || url.includes('&download');
+    
+    const isEEG = hasEEGExtension || (hasEEGPattern && hasDownloadParam);
+    
+    console.log("🔍 URL analysis:", {
+      url: url,
+      urlWithoutParams: urlWithoutParams,
+      hasEEGExtension: hasEEGExtension,
+      hasEEGPattern: hasEEGPattern,
+      hasDownloadParam: hasDownloadParam,
+      isEEG: isEEG
     });
+    
+    return isEEG;
+  }
+
+  // Single unified click handler
+  function handleLinkClick(e) {
+    const link = e.target.closest('a');
+    if (!link) return;
+
+    const href = link.href || link.getAttribute('href') || '';
+    const isEEG = isEEGFile(href);
+
+    console.log("🔍 Link clicked:", href, "isEEG:", isEEG);
+
+    if (isEEG) {
+      // Check if we already processed this click
+      if (processedClicks.has(href)) {
+        console.log("⏭️ Already processing this link, skipping");
+        return;
+      }
+      
+      processedClicks.add(href);
+      // Clear after 2 seconds to allow re-clicks
+      setTimeout(() => processedClicks.delete(href), 2000);
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      
+      console.log("🧠 Intercepted EEG link click:", href);
+      window.postMessage({ type: "EEG_INTERCEPT", href }, "*");
+      return false;
+    }
+  }
+
+  // Single event listener for all cases
+  document.addEventListener('click', handleLinkClick, { 
+    capture: true, 
+    passive: false 
   });
-  
-  observer.observe(document.body, { childList: true, subtree: true });
+
+  console.log("✅ EEG interceptor initialized with enhanced URL detection");
 }

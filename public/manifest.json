@@ -1,11 +1,17 @@
 {
   "manifest_version": 3,
   "name": "EEG TXT Reader",
-  "version": "1.2",
+  "version": "1.4",
   "description": "Read and visualize EEG signals from .txt files with download interception",
-  "permissions": ["storage", "tabs", "downloads"],
+  "permissions": [
+    "storage",
+    "tabs",
+    "downloads",
+    "activeTab",
+    "notifications"
+  ],
   "host_permissions": [
-    "<all_urls>",
+    "*://*/*",
     "*://physionet.org/*",
     "*://*.physionet.org/*"
   ],
@@ -16,12 +22,17 @@
     {
       "matches": ["<all_urls>"],
       "js": ["contentScript.js"],
-      "run_at": "document_idle"
+      "run_at": "document_start",
+      "all_frames": true
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["libs/plotly.min.js", "viewer.html", "scriptInjector.js"],
+      "resources": [
+        "libs/plotly.min.js",
+        "viewer.html",
+        "scriptInjector.js"
+      ],
       "matches": ["<all_urls>"]
     }
   ],
