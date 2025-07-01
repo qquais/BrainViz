@@ -58,29 +58,44 @@ document.addEventListener('DOMContentLoaded', function() {
     const file = e.target.files[0];
     if (!file) return;
     
-    // Validate file type
-    if (!file.name.toLowerCase().endsWith('.txt')) {
-      alert('Only .txt files supported for manual upload');
+    // Get the filename in lowercase for checking
+    const fileName = file.name.toLowerCase();
+    
+    // Support both .txt and .edf files
+    if (!fileName.endsWith('.txt') && !fileName.endsWith('.edf')) {
+      alert('Only .txt and .edf files supported for manual upload');
       return;
     }
 
-    const reader = new FileReader();
-    
-    /**
-     * Handles successful file reading
-     * Stores the file content and opens the EEG viewer
-     * 
-     * @param {ProgressEvent} e - The FileReader load event
-     * @returns {void}
-     */
-    reader.onload = function(e) {
-      const text = e.target.result;
-      chrome.storage.local.set({ eegDataText: text }, function() {
-        chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
-      });
-    };
-    
-    reader.readAsText(file);
+    if (fileName.endsWith('.edf')) {
+      // Handle EDF files as binary
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const arrayBuffer = e.target.result;
+        const bufferArray = Array.from(new Uint8Array(arrayBuffer));
+        
+        chrome.storage.local.set({ 
+          eegDataBuffer: bufferArray,
+          eegDataType: 'edf'
+        }, function() {
+          chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
+        });
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      // Handle text files as before
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const text = e.target.result;
+        chrome.storage.local.set({ 
+          eegDataText: text,
+          eegDataType: 'text' 
+        }, function() {
+          chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
+        });
+      };
+      reader.readAsText(file);
+    }
   });
 
   /**
@@ -106,7 +121,7 @@ document.addEventListener('DOMContentLoaded', function() {
    * @returns {void}
    */
   clearDataBtn.addEventListener('click', function() {
-    chrome.storage.local.remove(['eegDataText'], function() {
+    chrome.storage.local.remove(['eegDataText', 'eegDataBuffer'], function() {
       alert('Data cleared!');
     });
   });

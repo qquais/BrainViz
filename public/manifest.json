@@ -30,6 +30,7 @@
     {
       "resources": [
         "libs/plotly.min.js",
+        "libs/edfdecoder.js",
         "viewer.html",
         "scriptInjector.js"
       ],

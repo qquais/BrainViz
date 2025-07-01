@@ -38,6 +38,12 @@ function isEEGDownload(url) {
     console.log("⏭️ No EEG file extension, ignoring");
     return false;
   }
+
+  // EDF files are always EEG data, so approve them immediately
+  if (urlLower.endsWith('.edf')) {
+    console.log("🎯 EDF file detected, definitely EEG data");
+    return true;
+  }
   
   // 2. Additional patterns that suggest it's actually EEG data
   const hasEEGPatterns = urlLower.includes('eeg') ||
@@ -128,7 +134,6 @@ async function handleDownload(url) {
     const response = await fetch(url);
     console.log("📡 Fetch response:", response.status, response.statusText);
     
-    // Check content type
     const contentType = response.headers.get('content-type') || '';
     console.log("📄 Content type:", contentType);
     
@@ -137,19 +142,40 @@ async function handleDownload(url) {
       return;
     }
     
-    const text = await response.text();
-    console.log("📄 File content length:", text.length);
+    // Check if it's an EDF file (binary) or text file
+    const isEDF = url.toLowerCase().endsWith('.edf');
     
-    // Basic validation that it's not HTML
-    if (text.toLowerCase().includes('<!doctype') || text.toLowerCase().includes('<html')) {
-      console.log("❌ Content appears to be HTML, not EEG data");
-      return;
+    if (isEDF) {
+      // Handle EDF files as binary data
+      const arrayBuffer = await response.arrayBuffer();
+      console.log("📄 EDF file buffer length:", arrayBuffer.byteLength);
+      
+      // Store as binary data for EDF processing
+      chrome.storage.local.set({ 
+        eegDataBuffer: Array.from(new Uint8Array(arrayBuffer)),
+        eegDataType: 'edf'
+      }, () => {
+        console.log("💾 EDF data stored, opening viewer");
+        chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
+      });
+    } else {
+      // Handle text files as before
+      const text = await response.text();
+      console.log("📄 Text file content length:", text.length);
+      
+      if (text.toLowerCase().includes('<!doctype') || text.toLowerCase().includes('<html')) {
+        console.log("❌ Content appears to be HTML, not EEG data");
+        return;
+      }
+      
+      chrome.storage.local.set({ 
+        eegDataText: text,
+        eegDataType: 'text' 
+      }, () => {
+        console.log("💾 Text data stored, opening viewer");
+        chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
+      });
     }
-    
-    chrome.storage.local.set({ eegDataText: text }, () => {
-      console.log("💾 Data stored, opening viewer");
-      chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
-    });
   } catch (error) {
     console.error("❌ Failed to fetch:", error);
   }
