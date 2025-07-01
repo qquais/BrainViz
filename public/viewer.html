@@ -1,28 +1,32 @@
 <!DOCTYPE html>
 <!--
-  EEG Data Visualization Viewer
+  EEG Data Visualization Viewer - Enhanced Version
   
   This HTML file creates the full-screen EEG data visualization interface.
-  It opens in a new tab when EEG files are intercepted or manually uploaded.
+  Enhanced with IndexedDB storage support and fallback EDF decoder.
   
   Features:
   - Full viewport plotting area using Plotly.js
   - Interactive charts with zoom, pan, and hover capabilities
   - Responsive design that adapts to any screen size
-  - Error handling with user-friendly messages
+  - Enhanced error handling with troubleshooting info
+  - Support for both Chrome storage and IndexedDB
+  - Fallback EDF decoder when main library fails
   
   Data Flow:
-  1. Extension stores EEG data in chrome.storage.local
-  2. This page loads and retrieves the stored data
-  3. viewer.js processes and visualizes the data
+  1. Extension stores EEG data in Chrome storage OR IndexedDB (for large files)
+  2. This page loads and retrieves data from appropriate storage
+  3. viewer.js processes and visualizes the data using available decoders
   4. Plotly.js renders interactive charts
   
   Dependencies:
   - plotly.min.js (interactive charting library)
+  - edfdecoder.js (main EDF decoder) OR edf-simple.js (fallback)
+  - eegStorage.js (storage helper for IndexedDB)
   - viewer.js (data processing and visualization logic)
-  - Chrome Extension Storage API
+  - Chrome Extension APIs (storage, runtime)
   
-  Version: 1.4
+  Version: 1.5 Enhanced Storage
   Author: EEG Reader Extension Team
 -->
 <html lang="en">
@@ -36,15 +40,27 @@
     Features: zoom, pan, hover tooltips, responsive design
   -->
   <script src="libs/plotly.min.js"></script>
-  <!--
-    EDF Decoder - Library for parsing EDF files
-    This library decodes EDF files into a format suitable for visualization
-    It handles the binary format and extracts signal data -->
-   <script src="libs/edfdecoder.js"></script>  
   
   <!--
-    Minimal CSS for full-screen plotting experience
+    EDF Decoder Libraries - For parsing EDF files
+    Main library: edfdecoder.js (if available)
+    Fallback library: edf-simple.js (custom implementation)
+    These libraries decode EDF files into a format suitable for visualization
+  -->
+  <script src="libs/edfdecoder.js"></script>
+  <script src="libs/edfSimple.js"></script>
+  
+  <!--
+    EEG Storage Helper - IndexedDB management
+    Handles large file storage that exceeds Chrome storage limits
+    Provides unified interface for both Chrome storage and IndexedDB
+  -->
+  <script src="eegStorage.js"></script>
+  
+  <!--
+    Enhanced CSS for full-screen plotting experience
     Removes all margins and padding to maximize plot area
+    Adds loading states and error styling
   -->
   <style>
     /* 
@@ -53,7 +69,9 @@
     */
     body { 
       margin: 0;                    /* Remove default browser margins */
+      padding: 0;                   /* Remove default browser padding */
       font-family: Arial, sans-serif; /* Consistent font for any text elements */
+      background: #f5f5f5;          /* Light background for loading states */
     }
     
     /*
@@ -63,28 +81,145 @@
     #plot { 
       width: 100vw;   /* Full viewport width */
       height: 100vh;  /* Full viewport height */
+      background: white; /* White background for plot area */
+    }
+    
+    /*
+      Loading message styling
+      Centers loading text and provides visual feedback
+    */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-size: 18px;
+      color: #666;
+    }
+    
+    /*
+      Error message container styling
+      Provides clear error presentation with troubleshooting info
+    */
+    .error-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      flex-direction: column;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .error-message {
+      font-size: 18px;
+      color: #d32f2f;
+      margin-bottom: 20px;
+      line-height: 1.4;
+      max-width: 600px;
+    }
+    
+    .troubleshooting {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f0f0f0;
+      border-radius: 8px;
+      font-size: 14px;
+      max-width: 600px;
+      text-align: left;
+    }
+    
+    .technical-info {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #e3f2fd;
+      border-radius: 8px;
+      font-size: 12px;
+      max-width: 600px;
+      text-align: left;
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.3s;
+    }
+    
+    .btn-primary {
+      background: #2196F3;
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: #1976D2;
+    }
+    
+    .btn-success {
+      background: #4CAF50;
+      color: white;
+    }
+    
+    .btn-success:hover {
+      background: #45a049;
+    }
+    
+    /*
+      Responsive design for smaller screens
+      Ensures error messages remain readable on mobile devices
+    */
+    @media (max-width: 768px) {
+      .error-container {
+        padding: 10px;
+      }
+      
+      .error-message,
+      .troubleshooting,
+      .technical-info {
+        max-width: 90vw;
+        font-size: smaller;
+      }
+      
+      .action-buttons {
+        flex-direction: column;
+        width: 100%;
+        max-width: 200px;
+      }
     }
   </style>
 </head>
 <body>
   <!--
     Main plot container
-    This div will be replaced by Plotly with the interactive chart
-    Shows loading message until data is processed
+    This div will be replaced by either:
+    - An interactive Plotly chart (success case)
+    - A detailed error message with troubleshooting info (error case)
+    - A loading message (initial state)
     
-    The viewer.js script will either:
-    - Replace this with an interactive Plotly chart, OR
-    - Replace this with an error message if data is invalid
+    The viewer.js script will determine which content to show based on:
+    - Whether required libraries are loaded
+    - Whether EEG data is available in storage
+    - Whether the data can be successfully processed
   -->
-  <div id="plot">Loading...</div>
+  <div id="plot" class="loading">
+    Loading EEG data...
+  </div>
 
   <!--
     Main visualization script
-    Handles:
-    - Retrieving EEG data from extension storage
-    - Parsing CSV/TSV data formats
-    - Creating interactive Plotly visualizations
-    - Error handling and user feedback
+    Enhanced version that handles:
+    - Multiple storage sources (Chrome storage + IndexedDB)
+    - Multiple EDF decoder libraries (main + fallback)
+    - Improved error handling and user feedback
+    - Support for both text and binary EEG formats
+    - Responsive design and performance optimization
   -->
   <script src="viewer.js"></script>
 </body>

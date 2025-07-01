@@ -1,319 +1,394 @@
 /**
- * EEG Data Visualization Module - Fallback Version
- * Handles loading, parsing, and plotting of EEG signal data using Plotly.js
- * With fallback for missing EDF decoder
- * 
- * @fileoverview Main viewer script that processes EEG data and creates interactive plots
- * @author EEG Reader Extension
- * @version 1.4.2 - Fallback
+ * Complete Fixed EEG Viewer with Robust Error Handling
+ * This version handles the specific issue where the viewer closes after data loading
  */
 
-/**
- * Initializes the EEG viewer when the DOM is loaded
- * Retrieves stored EEG data and begins the visualization process
- * 
- * @listens document.DOMContentLoaded
- * @returns {void}
- */
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('🔧 EEG Viewer loaded');
-  
-  // Check if required libraries are loaded
-  console.log('📚 Checking libraries...');
-  console.log('Plotly available:', typeof Plotly !== 'undefined');
-  console.log('edfdecoder available:', typeof edfdecoder !== 'undefined');
-  
-  chrome.storage.local.get(['eegDataText', 'eegDataBuffer', 'eegDataType'], (result) => {
-    console.log('📦 Storage contents:', result);
-    
-    if (!result.eegDataText && !result.eegDataBuffer) {
-      showError('❌ No EEG data found');
-      return;
-    }
+console.log('🔧 EEG Viewer starting...');
 
-    try {
-      if (result.eegDataType === 'edf') {
-        console.log('🔬 Processing EDF data...');
-        
-        // Check if EDF decoder is available
-        if (typeof edfdecoder === 'undefined') {
-          console.error('❌ EDF decoder library not loaded!');
-          showError('❌ EDF decoder library not found. Please add edfdecoder.js to your libs/ folder and reload the extension.');
-          return;
-        }
-        
-        plotEDFData(result.eegDataBuffer);
-      } else {
-        console.log('📄 Processing text data...');
-        plotEEGData(result.eegDataText);
-      }
-    } catch (error) {
-      console.error('💥 Critical error:', error);
-      showError('❌ Error processing data: ' + error.message);
-    }
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log('🚀 DOM loaded, initializing viewer...');
+  
+  // Prevent page from closing on errors
+  window.addEventListener('error', (e) => {
+    console.error('💥 Global error caught:', e.error);
+    showError(`JavaScript Error: ${e.error.message}`);
+    e.preventDefault(); // Prevent default error handling
+    return true;
   });
+
+  window.addEventListener('unhandledrejection', (e) => {
+    console.error('💥 Unhandled promise rejection:', e.reason);
+    showError(`Promise Error: ${e.reason}`);
+    e.preventDefault();
+    return true;
+  });
+
+  try {
+    await initializeViewer();
+  } catch (error) {
+    console.error('💥 Initialization failed:', error);
+    showError(`Initialization failed: ${error.message}`);
+  }
 });
 
-/**
- * Parses and visualizes EDF (European Data Format) binary data using Plotly.js interactive charts.
- * Enhanced with extensive error handling and debugging
- * 
- * @param {number[]} bufferArray - Array of integers representing the binary EDF file data
- * @returns {void}
- */
-function plotEDFData(bufferArray) {
-  console.log('🔬 plotEDFData called with buffer length:', bufferArray ? bufferArray.length : 'undefined');
+async function initializeViewer() {
+  console.log('🔧 Initializing viewer...');
   
-  // Clear loading message immediately
-  document.getElementById('plot').innerHTML = 'Processing EDF file...';
-  
-  try {
-    // Validate input
-    if (!bufferArray || !Array.isArray(bufferArray)) {
-      throw new Error('Invalid buffer array provided');
-    }
-    
-    if (bufferArray.length === 0) {
-      throw new Error('Empty buffer array');
-    }
-    
-    console.log('✅ Buffer validation passed');
-    
-    // Convert array back to ArrayBuffer
-    console.log('🔄 Converting to ArrayBuffer...');
-    const buffer = new Uint8Array(bufferArray).buffer;
-    console.log('📏 ArrayBuffer size:', buffer.byteLength, 'bytes');
-    
-    // Check if edfdecoder is available
-    if (typeof edfdecoder === 'undefined') {
-      throw new Error('EDF decoder library not available. Please add edfdecoder.js to your libs/ folder.');
-    }
-    
-    // Use EDF decoder
-    console.log('🔧 Initializing EDF decoder...');
-    const decoder = new edfdecoder.EdfDecoder();
-    
-    console.log('📥 Setting input buffer...');
-    decoder.setInput(buffer);
-    
-    console.log('⚙️ Decoding EDF data...');
-    decoder.decode();
-    
-    console.log('📤 Getting decoded output...');
-    const edfData = decoder.getOutput();
-    
-    if (!edfData) {
-      throw new Error('EDF decoder returned null/undefined');
-    }
-    
-    console.log('✅ EDF decoded successfully');
-    console.log('📊 EDF Data object:', edfData);
-    
-    // Get signal information
-    const numSignals = edfData.getNumberOfSignals();
-    const numRecords = edfData.getNumberOfRecords();
-    
-    console.log('📈 Number of signals:', numSignals);
-    console.log('📈 Number of records:', numRecords);
-    
-    if (numSignals === 0 || numRecords === 0) {
-      throw new Error(`No valid signals found in EDF file (signals: ${numSignals}, records: ${numRecords})`);
-    }
-    
-    // For now, plot the first signal
-    const signalIndex = 0;
-    console.log(`🎯 Processing signal ${signalIndex}...`);
-    
-    // Get signal metadata
-    const signalLabel = edfData.getSignalLabel(signalIndex);
-    const sampleRate = edfData.getSampleRate(signalIndex);
-    
-    // Try to get physical unit (some versions might not have this method)
-    let physicalUnit = 'Amplitude';
-    try {
-      if (edfData.getPhysicalUnit) {
-        physicalUnit = edfData.getPhysicalUnit(signalIndex) || 'Amplitude';
-      }
-    } catch (e) {
-      console.log('⚠️ getPhysicalUnit not available, using default');
-    }
-    
-    console.log(`📊 Signal: "${signalLabel}", Sample rate: ${sampleRate} Hz, Unit: ${physicalUnit}`);
-    
-    // Concatenate all records for this signal
-    console.log('🔗 Concatenating signal records...');
-    const allSignalData = edfData.getPhysicalSignalConcatRecords(signalIndex, 0, numRecords);
-    
-    if (!allSignalData || allSignalData.length === 0) {
-      throw new Error('No signal data extracted from EDF file');
-    }
-    
-    console.log('📏 Total signal data points:', allSignalData.length);
-    
-    // Create time array based on sample rate
-    console.log('⏱️ Creating time array...');
-    const timeArray = allSignalData.map((_, index) => index / sampleRate);
-    
-    // Limit data for performance (same as text files)
-    const maxPoints = 5000;
-    const step = Math.max(1, Math.floor(allSignalData.length / maxPoints));
-    
-    console.log(`🎛️ Decimation: ${allSignalData.length} -> ~${Math.floor(allSignalData.length / step)} points (step: ${step})`);
-    
-    const decimatedTime = timeArray.filter((_, index) => index % step === 0);
-    const decimatedSignal = allSignalData.filter((_, index) => index % step === 0);
-    
-    console.log('📊 Final data points:', decimatedTime.length);
-    
-    // Create Plotly trace
-    const trace = {
-      x: decimatedTime,
-      y: decimatedSignal,
-      type: 'scatter',
-      mode: 'lines',
-      name: signalLabel || 'EDF Signal',
-      line: { color: '#1f77b4', width: 1 }
-    };
-
-    const layout = {
-      title: `EDF Signal: ${signalLabel || 'Unknown'} (${numSignals} total signals)`,
-      xaxis: { title: 'Time (s)' },
-      yaxis: { title: physicalUnit },
-      margin: { l: 60, r: 60, t: 60, b: 50 }
-    };
-
-    const config = {
-      displayModeBar: true,
-      displaylogo: false
-    };
-
-    console.log('🎨 Creating Plotly chart...');
-    Plotly.newPlot('plot', [trace], layout, config).then(() => {
-      console.log('✅ EDF Plot created successfully');
-    }).catch((plotError) => {
-      console.error('❌ Plotly error:', plotError);
-      throw new Error('Failed to create plot: ' + plotError.message);
-    });
-    
-  } catch (error) {
-    console.error('💥 EDF processing error:', error);
-    console.error('📍 Error stack:', error.stack);
-    
-    // Provide specific error messages
-    let errorMessage = error.message;
-    if (error.message.includes('edfdecoder')) {
-      errorMessage = 'EDF decoder library missing. Please download edfdecoder.js and add it to your libs/ folder.';
-    } else if (error.message.includes('EdfDecoder')) {
-      errorMessage = 'EDF decoder failed to initialize. Make sure the file is a valid EDF format.';
-    }
-    
-    showError('❌ Error processing EDF file: ' + errorMessage);
+  // Check Plotly availability
+  if (typeof Plotly === 'undefined') {
+    throw new Error('Plotly.js library not loaded');
   }
+  console.log('✅ Plotly.js available');
+
+  // Start loading data
+  await loadAndProcessData();
 }
 
-/**
- * Parses EEG text data and creates an interactive Plotly visualization
- * Handles CSV/TSV format detection, data parsing, and plot generation
- * 
- * @param {string} text - Raw EEG data as a string (CSV/TSV format)
- * @returns {void}
- */
-function plotEEGData(text) {
-  console.log('📄 plotEEGData called with text length:', text ? text.length : 'undefined');
+async function loadAndProcessData() {
+  console.log('📦 Loading data from storage...');
   
-  // Clear loading message immediately
-  document.getElementById('plot').innerHTML = '';
-  
-  // Split text into individual lines
-  const lines = text.trim().split('\n');
-  
-  if (lines.length < 2) {
-    showError('❌ File needs header and data rows');
-    return;
-  }
+  return new Promise((resolve, reject) => {
+    // Add timeout to prevent infinite hanging
+    const timeout = setTimeout(() => {
+      reject(new Error('Storage access timeout after 10 seconds'));
+    }, 10000);
 
-  // Parse headers from first line
-  const headers = lines[0].split(/[,\t;]/).map(h => h.trim());
-  console.log('📋 Headers:', headers);
-
-  // Initialize data arrays
-  const time = [];
-  const signal = [];
-  
-  // Parse data rows with performance limit
-  for (let i = 1; i < Math.min(lines.length, 5000); i++) { // Limit for performance
-    const row = lines[i].split(/[,\t;]/);
-    
-    if (row.length >= 2) {
-      const t = parseFloat(row[0]);
-      const s = parseFloat(row[1]);
+    chrome.storage.local.get([
+      'eegDataText', 
+      'eegDataBuffer', 
+      'eegDataType', 
+      'eegDataSource',
+      'eegFileName'
+    ], async (result) => {
+      clearTimeout(timeout);
       
-      // Only include valid numeric data points
-      if (!isNaN(t) && !isNaN(s)) {
-        time.push(t);
-        signal.push(s);
+      try {
+        console.log('📦 Storage result:', {
+          hasText: !!result.eegDataText,
+          hasBuffer: !!result.eegDataBuffer,
+          dataType: result.eegDataType,
+          source: result.eegDataSource,
+          fileName: result.eegFileName
+        });
+
+        if (!result.eegDataText && !result.eegDataBuffer) {
+          throw new Error('No EEG data found in storage');
+        }
+
+        if (result.eegDataType === 'edf' && result.eegDataBuffer) {
+          console.log('🔬 Processing EDF data...');
+          await processEDFData(result.eegDataBuffer, result.eegFileName);
+        } else if (result.eegDataText) {
+          console.log('📄 Processing text data...');
+          await processTextData(result.eegDataText, result.eegFileName);
+        } else {
+          throw new Error('Invalid data format in storage');
+        }
+
+        resolve();
+      } catch (error) {
+        console.error('❌ Data processing error:', error);
+        reject(error);
       }
-    }
-  }
-
-  if (time.length === 0) {
-    showError('❌ No valid data found');
-    return;
-  }
-
-  console.log('📊 Parsed data points:', time.length);
-
-  // Create Plotly trace
-  const trace = {
-    x: time,
-    y: signal,
-    type: 'scatter',
-    mode: 'lines',
-    name: headers[1] || 'EEG Signal',
-    line: { color: '#1f77b4', width: 1 }
-  };
-
-  const layout = {
-    title: 'EEG Signal Visualization',
-    xaxis: { title: 'Time (s)' },
-    yaxis: { title: 'Amplitude (µV)' },
-    margin: { l: 60, r: 60, t: 60, b: 50 }
-  };
-
-  const config = {
-    displayModeBar: true,
-    displaylogo: false
-  };
-
-  // Create the interactive plot
-  Plotly.newPlot('plot', [trace], layout, config).then(() => {
-    console.log('✅ Text plot created successfully');
+    });
   });
 }
 
-/**
- * Displays error messages to the user with a friendly interface
- * Replaces the plot area with an error message and close button
- * 
- * @param {string} message - The error message to display to the user
- * @returns {void}
- */
-function showError(message) {
-  console.log('🚨 Showing error:', message);
-  document.getElementById('plot').innerHTML = `
-    <div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; padding: 20px;">
-      <div style="font-size: 18px; color: #d32f2f; margin-bottom: 20px; text-align: center; max-width: 600px; line-height: 1.4;">
-        ${message}
-      </div>
-      <div style="margin-bottom: 20px; padding: 15px; background: #f0f0f0; border-radius: 8px; font-size: 14px; max-width: 600px;">
-        <strong>How to fix:</strong><br>
-        1. Download edfdecoder.js from: https://github.com/Pixpipe/edfdecoder<br>
-        2. Save it to your extension's libs/ folder<br>
-        3. Reload the extension
-      </div>
-      <button onclick="window.close()" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
-        Close Window
-      </button>
-    </div>
-  `;
+async function processEDFData(bufferArray, fileName) {
+  console.log('🔬 Processing EDF data...', fileName);
+  
+  try {
+    // Convert array back to ArrayBuffer
+    const arrayBuffer = new Uint8Array(bufferArray).buffer;
+    console.log('📄 Converted to ArrayBuffer:', arrayBuffer.byteLength, 'bytes');
+
+    // Try to process with available EDF decoder
+    let edfData = null;
+    
+    if (typeof edfdecoder !== 'undefined' && edfdecoder.EdfDecoder) {
+      console.log('🔧 Using main EDF decoder...');
+      const decoder = new edfdecoder.EdfDecoder();
+      decoder.setInput(arrayBuffer);
+      decoder.decode();
+      edfData = decoder.getOutput();
+    } else if (typeof SimpleEDFDecoder !== 'undefined') {
+      console.log('🔧 Using simple EDF decoder...');
+      const decoder = new SimpleEDFDecoder();
+      edfData = decoder.decode(arrayBuffer);
+    } else {
+      console.warn('⚠️ No EDF decoder available, using basic header parsing...');
+      edfData = parseEDFBasic(arrayBuffer);
+    }
+
+    if (!edfData) {
+      throw new Error('EDF decoder returned null - file may be corrupted');
+    }
+
+    console.log('✅ EDF data processed successfully');
+    await plotEDFSignals(edfData, fileName);
+    
+  } catch (error) {
+    console.error('❌ EDF processing failed:', error);
+    
+    // Fallback: show raw data visualization
+    showError(`EDF processing failed: ${error.message}\n\nTrying basic binary visualization...`);
+    
+    setTimeout(() => {
+      try {
+        plotBinaryData(bufferArray, fileName);
+      } catch (fallbackError) {
+        showError(`All processing methods failed: ${fallbackError.message}`);
+      }
+    }, 2000);
+  }
 }
+
+async function processTextData(textData, fileName) {
+  console.log('📄 Processing text data...', fileName);
+  
+  try {
+    const lines = textData.split('\n').filter(line => line.trim().length > 0);
+    console.log('📊 Found', lines.length, 'lines');
+
+    if (lines.length === 0) {
+      throw new Error('Text file appears to be empty');
+    }
+
+    // Parse the text data
+    const parsedData = parseTextEEG(lines);
+    await plotTextSignals(parsedData, fileName);
+    
+  } catch (error) {
+    console.error('❌ Text processing failed:', error);
+    showError(`Text processing failed: ${error.message}`);
+  }
+}
+
+function parseEDFBasic(arrayBuffer) {
+  // Basic EDF header parsing for fallback
+  const view = new DataView(arrayBuffer);
+  const decoder = new TextDecoder('ascii', { fatal: false });
+  
+  // Create a minimal EDF-like object
+  return {
+    signals: [{
+      label: 'EDF Signal',
+      data: Array.from(new Int16Array(arrayBuffer.slice(256, Math.min(arrayBuffer.byteLength, 10000))))
+    }],
+    sampleRate: 256,
+    duration: 10
+  };
+}
+
+function parseTextEEG(lines) {
+  console.log('📊 Parsing text EEG data...');
+  
+  // Skip comment lines and find data
+  const dataLines = lines.filter(line => 
+    !line.startsWith('#') && 
+    !line.startsWith('%') && 
+    line.includes(',') || line.includes('\t') || line.includes(' ')
+  );
+
+  if (dataLines.length === 0) {
+    throw new Error('No valid data lines found in text file');
+  }
+
+  // Detect delimiter
+  const firstLine = dataLines[0];
+  const delimiter = firstLine.includes(',') ? ',' : 
+                   firstLine.includes('\t') ? '\t' : ' ';
+
+  console.log('🔍 Using delimiter:', delimiter === '\t' ? 'tab' : delimiter);
+
+  // Parse data
+  const signals = [];
+  const timeData = [];
+  
+  for (let i = 0; i < Math.min(dataLines.length, 10000); i++) { // Limit for performance
+    const values = dataLines[i].split(delimiter)
+      .map(v => v.trim())
+      .filter(v => v.length > 0)
+      .map(v => parseFloat(v))
+      .filter(v => !isNaN(v));
+
+    if (values.length > 0) {
+      timeData.push(i * 0.004); // Assume 250 Hz sample rate
+      
+      // Initialize signal arrays
+      if (signals.length === 0) {
+        for (let j = 0; j < values.length; j++) {
+          signals.push({
+            label: `Channel ${j + 1}`,
+            data: []
+          });
+        }
+      }
+      
+      // Add values to signals
+      for (let j = 0; j < Math.min(values.length, signals.length); j++) {
+        signals[j].data.push(values[j]);
+      }
+    }
+  }
+
+  return { signals, timeData };
+}
+
+async function plotEDFSignals(edfData, fileName) {
+  console.log('📈 Plotting EDF signals...');
+  
+  try {
+    const traces = [];
+    const numSignals = Math.min(edfData.getNumberOfSignals ? edfData.getNumberOfSignals() : 1, 8);
+    
+    for (let i = 0; i < numSignals; i++) {
+      const signalData = edfData.getPhysicalSignalConcatRecords ? 
+        edfData.getPhysicalSignalConcatRecords(i, 0, Math.min(10, edfData.getNumberOfRecords())) :
+        edfData.signals[i].data.slice(0, 2500);
+      
+      const signalLabel = edfData.getSignalLabel ? edfData.getSignalLabel(i) : `Signal ${i + 1}`;
+      
+      if (signalData && signalData.length > 0) {
+        traces.push({
+          y: signalData,
+          type: 'scatter',
+          mode: 'lines',
+          name: signalLabel,
+          yaxis: `y${i + 1}`
+        });
+      }
+    }
+
+    await createPlot(traces, `EDF File: ${fileName}`, true);
+    
+  } catch (error) {
+    console.error('❌ EDF plotting failed:', error);
+    throw error;
+  }
+}
+
+async function plotTextSignals(parsedData, fileName) {
+  console.log('📈 Plotting text signals...');
+  
+  try {
+    const traces = [];
+    const maxSignals = Math.min(parsedData.signals.length, 6);
+    
+    for (let i = 0; i < maxSignals; i++) {
+      const signal = parsedData.signals[i];
+      if (signal.data.length > 0) {
+        traces.push({
+          x: parsedData.timeData.slice(0, signal.data.length),
+          y: signal.data,
+          type: 'scatter',
+          mode: 'lines',
+          name: signal.label,
+          yaxis: `y${i + 1}`
+        });
+      }
+    }
+
+    await createPlot(traces, `Text File: ${fileName}`, true);
+    
+  } catch (error) {
+    console.error('❌ Text plotting failed:', error);
+    throw error;
+  }
+}
+
+function plotBinaryData(bufferArray, fileName) {
+  console.log('📈 Creating binary data visualization...');
+  
+  // Create a simple visualization of binary data
+  const sampleData = bufferArray.slice(256, 2256); // Skip header, take 2000 samples
+  const traces = [{
+    y: sampleData,
+    type: 'scatter',
+    mode: 'lines',
+    name: 'Raw Binary Data',
+    line: { color: 'blue' }
+  }];
+
+  createPlot(traces, `Binary Data: ${fileName}`, false);
+}
+
+async function createPlot(traces, title, useSubplots) {
+  console.log('📊 Creating plot with', traces.length, 'traces');
+  
+  try {
+    const layout = {
+      title: title,
+      showlegend: true,
+      height: window.innerHeight,
+      margin: { l: 50, r: 50, t: 50, b: 50 }
+    };
+
+    if (useSubplots && traces.length > 1) {
+      // Create subplots for multiple signals
+      const subplot_height = 1 / traces.length;
+      for (let i = 0; i < traces.length; i++) {
+        layout[`yaxis${i + 1}`] = {
+          domain: [i * subplot_height, (i + 1) * subplot_height - 0.02],
+          title: traces[i].name
+        };
+      }
+    } else {
+      layout.yaxis = { title: 'Amplitude' };
+      layout.xaxis = { title: 'Time/Sample' };
+    }
+
+    console.log('🎨 Rendering plot...');
+    
+    await Plotly.newPlot('plot', traces, layout, {
+      responsive: true,
+      displayModeBar: true,
+      modeBarButtonsToRemove: ['lasso2d', 'select2d']
+    });
+    
+    console.log('✅ Plot rendered successfully');
+    
+  } catch (error) {
+    console.error('❌ Plot creation failed:', error);
+    throw error;
+  }
+}
+
+function showError(message) {
+  console.log('🚨 Showing error message');
+  
+  const plotDiv = document.getElementById('plot');
+  if (plotDiv) {
+    plotDiv.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; padding: 20px; text-align: center;">
+        <div style="font-size: 18px; color: #d32f2f; margin-bottom: 20px; max-width: 600px; line-height: 1.4;">
+          ${message}
+        </div>
+        <div style="margin-bottom: 20px; padding: 15px; background: #f0f0f0; border-radius: 8px; font-size: 14px; max-width: 600px; text-align: left;">
+          <strong>Debug Information:</strong><br>
+          - Check browser console (F12) for detailed logs<br>
+          - Extension may need to be reloaded<br>
+          - Try with a smaller test file first<br>
+          - Verify all library files are present
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button onclick="window.location.reload()" style="padding: 8px 16px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Reload Page
+          </button>
+          <button onclick="window.close()" style="padding: 8px 16px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Close Window
+          </button>
+        </div>
+      </div>
+    `;
+  }
+}
+
+// Initialize loading message
+document.getElementById('plot').innerHTML = `
+  <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 18px; color: #666;">
+    🧠 Loading EEG data...
+  </div>
+`;
+
+console.log('✅ Viewer script loaded successfully');
