@@ -12,6 +12,7 @@
     "unlimitedStorage"
   ],
   "host_permissions": [
+    "http://localhost:5000/",
     "*://*/*",
     "*://physionet.org/*",
     "*://*.physionet.org/*"
