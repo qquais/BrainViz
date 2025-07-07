@@ -21,7 +21,6 @@
   
   Dependencies:
   - plotly.min.js (interactive charting library)
-  - edfdecoder.js (main EDF decoder) OR edf-simple.js (fallback)
   - eegStorage.js (storage helper for IndexedDB)
   - viewer.js (data processing and visualization logic)
   - Chrome Extension APIs (storage, runtime)
@@ -40,15 +39,6 @@
     Features: zoom, pan, hover tooltips, responsive design
   -->
   <script src="libs/plotly.min.js"></script>
-  
-  <!--
-    EDF Decoder Libraries - For parsing EDF files
-    Main library: edfdecoder.js (if available)
-    Fallback library: edf-simple.js (custom implementation)
-    These libraries decode EDF files into a format suitable for visualization
-  -->
-  <script src="libs/edfdecoder.js"></script>
-  <script src="libs/edfSimple.js"></script>
   
   <!--
     EEG Storage Helper - IndexedDB management

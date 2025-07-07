@@ -32,8 +32,6 @@
     {
       "resources": [
         "libs/plotly.min.js",
-        "libs/edfdecoder.js",
-        "libs/edfSimple.js",
         "eegStorage.js",
         "viewer.html",
         "scriptInjector.js"
