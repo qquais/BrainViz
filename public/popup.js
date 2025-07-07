@@ -79,7 +79,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         eegDataSize: arrayBuffer.byteLength,
         eegDataTimestamp: Date.now()
       };
-
+      
+      await chrome.storage.local.clear();
       await setStorageData(storageData);
       
       console.log('💾 EDF data stored, opening viewer...');

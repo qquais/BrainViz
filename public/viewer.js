@@ -110,8 +110,11 @@ async function plotPreviewEDF(data, fileName) {
     );
 
     for (let i = 0; i < Math.min(data.signals.length, 6); i++) {
-      const y = downsample(data.signals[i]);
-      const x = downsample(timeAxis, data.signals[i].length / y.length);
+      const rawY = data.signals[i];
+      const factor = Math.ceil(rawY.length / 1000); // Downsample to ~1000 points
+      const y = downsample(rawY, factor);
+      const x = downsample(timeAxis, factor);
+      console.log(`📉 Channel ${i}: raw=${rawY.length}, downsampled=${y.length}`);
 
       traces.push({
         x,
