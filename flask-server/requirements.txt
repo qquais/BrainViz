@@ -1,0 +1,6 @@
+flask
+flask-cors
+mne
+numpy
+pandas
+

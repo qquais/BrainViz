@@ -73,35 +73,27 @@ if (window.eegInterceptorInitialized) {
    * 
    * @listens document.click
    */
-  function handleLinkClick(e) {
-    const link = e.target.closest('a');
-    if (!link) return;
+function handleLinkClick(e) {
+  const link = e.target.closest('a');
+  if (!link) return;
 
-    const href = link.href || link.getAttribute('href') || '';
-    const isEEG = isEEGFile(href);
+  const href = link.href || link.getAttribute('href');
+  const isEEG = isEEGFile(href); // your existing heuristics
 
-    console.log("🔍 Link clicked:", href, "isEEG:", isEEG);
+  console.log("🔍 Link clicked:", href, "isEEG:", isEEG);
 
-    if (isEEG) {
-      // Check if we already processed this click
-      if (processedClicks.has(href)) {
-        console.log("⏭️ Already processing this link, skipping");
-        return;
-      }
-      
-      processedClicks.add(href);
-      // Clear after 2 seconds to allow re-clicks
-      setTimeout(() => processedClicks.delete(href), 2000);
+  if (isEEG) {
+    // Only prevent default if we're going to handle it
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
 
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      
-      console.log("🧠 Intercepted EEG link click:", href);
-      window.postMessage({ type: "EEG_INTERCEPT", href }, "*");
-      return false;
-    }
+    console.log("🧠 Intercepted EEG link click:", href);
+    window.postMessage({ type: "EEG_INTERCEPT", href }, "*");
+    return false;
   }
+}
+
 
   // Single event listener for all cases
   document.addEventListener('click', handleLinkClick, { 

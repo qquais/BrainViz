@@ -7,7 +7,7 @@
   
   Features:
   - Toggle switch for download interception
-  - Manual file upload area for .txt files
+  - Manual file upload area for .txt and .edf files
   - Clear data button for stored EEG data
   - Responsive design with hover effects
   
@@ -191,18 +191,18 @@
       <!-- Status text showing current intercept state -->
       <div class="status" id="interceptStatus">Loading...</div>
       <!-- Help text explaining the feature -->
-      <div class="info">When enabled, .txt and .zip EEG files will open in the visualizer instead of downloading</div>
+      <div class="info">When enabled, .txt, .edf and .zip EEG files will open in the visualizer instead of downloading</div>
     </div>
 
     <!-- Control group for manual file upload -->
     <div class="control-group">
       <!-- File upload area that triggers hidden file input -->
       <div class="file-input-area" id="fileInputArea">
-        <div class="upload-text">📁 Click to select EEG .txt file</div>
-        <div class="info">Supports .txt files (use download interception for .zip files)</div>
+        <div class="upload-text">📁 Click to select EEG file (.txt or .edf)</div>
+        <div class="info">Supports .txt and .edf files (use download interception for .zip files)</div>
       </div>
-      <!-- Hidden file input element (triggered by clicking upload area) -->
-      <input type="file" id="fileInput" accept=".txt" />
+      <!-- Hidden file input element - NOW ACCEPTS BOTH .txt AND .edf FILES -->
+      <input type="file" id="fileInput" accept=".txt,.edf" />
       <!-- Button to clear stored EEG data -->
       <button class="btn" id="clearDataBtn">Clear stored data</button>
     </div>
