@@ -221,4 +221,6 @@ class EEGStorage {
 }
 
 // Make EEGStorage available globally
-window.EEGStorage = EEGStorage;
+if (typeof window !== 'undefined') {
+  window.EEGStorage = EEGStorage;
+}
