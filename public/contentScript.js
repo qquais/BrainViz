@@ -8,6 +8,35 @@ function isExtensionContextValid() {
   }
 }
 
+// 🧠 EEG-specific keywords for validation
+function containsEEGKeywords(text) {
+  const lower = text.toLowerCase();
+  const eegKeywords = [
+    "eeg", "exg", "fp1", "fp2", "fz", "cz", "pz", "oz", "t3", "t4", "t5", "t6",
+    "channel", "sample_rate", "electrode"
+  ];
+  return eegKeywords.some(keyword => lower.includes(keyword));
+}
+
+// ✅ Robust EEG validation
+function isValidEEGText(text) {
+  const lower = text.toLowerCase();
+  if (lower.includes("<html") || lower.includes("<!doctype")) return false;
+
+  const lines = text.split("\n").filter(line => line.trim().length > 0);
+  if (lines.length < 10) return false;
+
+  const avgLineLen = lines.reduce((sum, line) => sum + line.length, 0) / lines.length;
+  if (avgLineLen < 10) return false;
+
+  const numericRatio = (text.match(/[-\d\.]/g) || []).length / text.length;
+  if (numericRatio < 0.2) return false;
+
+  if (!containsEEGKeywords(text)) return false;
+
+  return true;
+}
+
 function initializeEEGInterceptor() {
   console.log("🔧 Initializing EEG interceptor...");
 
@@ -77,11 +106,19 @@ function initializeEEGInterceptor() {
       const text = await response.text();
       console.log("📄 Fetched text length:", text.length);
 
-      // Send to background script for storage
+      const cleanFileName = href.split("/").pop().split("?")[0].toLowerCase();
+
+      if (!isValidEEGText(text)) {
+        console.log("⏭️ Not valid EEG content. Allowing normal download:", cleanFileName);
+        window.location.href = href;
+        return;
+      }
+
+      // ✅ Valid EEG, send to background for storage
       chrome.runtime.sendMessage({
         action: "storeTextEEG",
         text,
-        filename: href.split("/").pop().split("?")[0]
+        filename: cleanFileName
       }, (res) => {
         console.log("📨 Background responded:", res);
       });
