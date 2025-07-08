@@ -1,17 +1,17 @@
-console.log('🔧 EEG Viewer starting...');
+console.log("🔧 EEG Viewer starting...");
 
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('🚀 DOM loaded, initializing viewer...');
+document.addEventListener("DOMContentLoaded", async () => {
+  console.log("🚀 DOM loaded, initializing viewer...");
 
-  window.addEventListener('error', (e) => {
-    console.error('💥 Global error caught:', e.error);
+  window.addEventListener("error", (e) => {
+    console.error("💥 Global error caught:", e.error);
     showError(`JavaScript Error: ${e.error.message}`);
     e.preventDefault();
     return true;
   });
 
-  window.addEventListener('unhandledrejection', (e) => {
-    console.error('💥 Unhandled promise rejection:', e.reason);
+  window.addEventListener("unhandledrejection", (e) => {
+    console.error("💥 Unhandled promise rejection:", e.reason);
     showError(`Promise Error: ${e.reason}`);
     e.preventDefault();
     return true;
@@ -20,64 +20,96 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     await initializeViewer();
   } catch (error) {
-    console.error('💥 Initialization failed:', error);
+    console.error("💥 Initialization failed:", error);
     showError(`Initialization failed: ${error.message}`);
   }
 });
 
 async function initializeViewer() {
-  console.log('🔧 Initializing viewer...');
+  console.log("🔧 Initializing viewer...");
 
-  if (typeof Plotly === 'undefined') {
-    throw new Error('Plotly.js library not loaded');
+  if (typeof Plotly === "undefined") {
+    throw new Error("Plotly.js library not loaded");
   }
-  console.log('✅ Plotly.js available');
+  console.log("✅ Plotly.js available");
 
   await loadAndProcessData();
 }
 
 async function loadAndProcessData() {
-  console.log('📦 Loading data from storage...');
+  console.log("📦 Loading data from storage...");
 
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error('Storage access timeout after 10 seconds'));
+      reject(new Error("Storage access timeout after 10 seconds"));
     }, 10000);
 
-    chrome.storage.local.get([
-      'eegDataBuffer',
-      'eegDataType',
-      'eegFileName'
-    ], async (result) => {
-      clearTimeout(timeout);
+    chrome.storage.local.get(
+      ["eegDataBuffer", "eegDataText", "eegDataType", "eegFileName"],
+      async (result) => {
+        clearTimeout(timeout);
 
-      try {
-        if (!result.eegDataBuffer) {
-          throw new Error('No EEG data found in storage');
+        try {
+          if (result.eegDataType === "edf" && result.eegDataBuffer) {
+            console.log("🌐 Sending EDF to Flask API for preview...");
+            await sendToFlaskAndPlot(result.eegDataBuffer, result.eegFileName);
+          } else if (result.eegDataType === "text" && result.eegDataText) {
+            console.log("🌐 Sending text EEG to Flask API for preview...");
+            await sendTextToFlaskAndPlot(
+              result.eegDataText,
+              result.eegFileName
+            );
+          } else {
+            throw new Error("No EEG data found in storage");
+          }
+
+          resolve();
+        } catch (error) {
+          console.error("❌ Data processing error:", error);
+          reject(error);
         }
-
-        console.log('🌐 Sending EDF to Flask API for preview...');
-        await sendToFlaskAndPlot(result.eegDataBuffer, result.eegFileName);
-
-        resolve();
-      } catch (error) {
-        console.error('❌ Data processing error:', error);
-        reject(error);
       }
-    });
+    );
   });
 }
 
 async function sendToFlaskAndPlot(bufferArray, fileName) {
   try {
     const blob = new Blob([new Uint8Array(bufferArray)], {
-      type: 'application/octet-stream'
+      type: "application/octet-stream",
     });
 
     const formData = new FormData();
-    formData.append('file', blob, fileName || 'eeg.edf');
+    formData.append("file", blob, fileName || "eeg.edf");
 
-    const response = await fetch('http://localhost:5000/edf-preview', {
+    const response = await fetch("http://localhost:5000/edf-preview", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Flask error: ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log("✅ EDF Preview from Flask:", result);
+
+    await plotPreviewEDF(result, fileName);
+  } catch (error) {
+    console.error("❌ Error calling Flask API:", error);
+    showError(error.message);
+  }
+}
+
+async function sendTextToFlaskAndPlot(text, fileName) {
+  try {
+    const blob = new Blob([text], { type: 'text/plain' });
+
+    const formData = new FormData();
+    formData.append('file', blob, fileName || 'eeg.txt');
+
+    const response = await fetch('http://localhost:5000/txt-preview', {
       method: 'POST',
       body: formData
     });
@@ -88,7 +120,7 @@ async function sendToFlaskAndPlot(bufferArray, fileName) {
     }
 
     const result = await response.json();
-    console.log('✅ EDF Preview from Flask:', result);
+    console.log('✅ TXT EEG Preview from Flask:', result);
 
     await plotPreviewEDF(result, fileName);
   } catch (error) {
@@ -96,6 +128,7 @@ async function sendToFlaskAndPlot(bufferArray, fileName) {
     showError(error.message);
   }
 }
+
 
 function downsample(arr, factor = 10) {
   return arr.filter((_, i) => i % factor === 0);
@@ -114,22 +147,24 @@ async function plotPreviewEDF(data, fileName) {
       const factor = Math.ceil(rawY.length / 1000); // Downsample to ~1000 points
       const y = downsample(rawY, factor);
       const x = downsample(timeAxis, factor);
-      console.log(`📉 Channel ${i}: raw=${rawY.length}, downsampled=${y.length}`);
+      console.log(
+        `📉 Channel ${i}: raw=${rawY.length}, downsampled=${y.length}`
+      );
 
       traces.push({
         x,
         y,
-        type: 'scatter',
-        mode: 'lines',
+        type: "scatter",
+        mode: "lines",
         name: data.channel_names[i],
-        yaxis: `y${i + 1}`
+        yaxis: `y${i + 1}`,
       });
     }
 
     await createPlot(traces, `Preview: ${fileName}`, true);
   } catch (error) {
-    console.error('❌ EDF plotting failed:', error);
-    showError('Plotting failed: ' + error.message);
+    console.error("❌ EDF plotting failed:", error);
+    showError("Plotting failed: " + error.message);
   }
 }
 
@@ -139,7 +174,7 @@ async function createPlot(traces, title, useSubplots) {
       title,
       showlegend: true,
       height: window.innerHeight,
-      margin: { l: 50, r: 50, t: 50, b: 50 }
+      margin: { l: 50, r: 50, t: 50, b: 50 },
     };
 
     if (useSubplots && traces.length > 1) {
@@ -147,27 +182,27 @@ async function createPlot(traces, title, useSubplots) {
       for (let i = 0; i < traces.length; i++) {
         layout[`yaxis${i + 1}`] = {
           domain: [i * subplotHeight, (i + 1) * subplotHeight - 0.02],
-          title: traces[i].name
+          title: traces[i].name,
         };
       }
     } else {
-      layout.yaxis = { title: 'Amplitude' };
-      layout.xaxis = { title: 'Time (s)' };
+      layout.yaxis = { title: "Amplitude" };
+      layout.xaxis = { title: "Time (s)" };
     }
 
-    await Plotly.newPlot('plot', traces, layout, {
+    await Plotly.newPlot("plot", traces, layout, {
       responsive: true,
       displayModeBar: true,
-      modeBarButtonsToRemove: ['lasso2d', 'select2d']
+      modeBarButtonsToRemove: ["lasso2d", "select2d"],
     });
   } catch (error) {
-    console.error('❌ Plot creation failed:', error);
-    showError('Plot error: ' + error.message);
+    console.error("❌ Plot creation failed:", error);
+    showError("Plot error: " + error.message);
   }
 }
 
 function showError(message) {
-  const plotDiv = document.getElementById('plot');
+  const plotDiv = document.getElementById("plot");
   plotDiv.innerHTML = `
     <div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; padding: 20px; text-align: center;">
       <div style="font-size: 18px; color: #d32f2f; margin-bottom: 20px; max-width: 600px; line-height: 1.4;">
@@ -186,10 +221,10 @@ function showError(message) {
 }
 
 // Initial loading state
-document.getElementById('plot').innerHTML = `
+document.getElementById("plot").innerHTML = `
   <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 18px; color: #666;">
     🧠 Loading EEG data...
   </div>
 `;
 
-console.log('✅ Viewer script loaded successfully');
+console.log("✅ Viewer script loaded successfully");

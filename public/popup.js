@@ -113,6 +113,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         eegDataTimestamp: Date.now()
       };
 
+      await chrome.storage.local.clear();
       await setStorageData(storageData);
       
       console.log('💾 Text data stored, opening viewer...');
