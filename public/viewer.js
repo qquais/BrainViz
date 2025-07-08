@@ -37,8 +37,41 @@ async function initializeViewer() {
 }
 
 async function loadAndProcessData() {
-  console.log("📦 Loading data from storage...");
+  console.log("📦 Loading EEG data from storage...");
 
+  try {
+    const eegStore = new EEGStorage();
+
+    // Try to load EDF file from IndexedDB
+    const edfData = await eegStore.getEDFFile();
+    if (edfData && edfData.data) {
+      console.log("📦 Found EDF file in IndexedDB:", edfData.filename);
+      await sendToFlaskAndPlot(edfData.data, edfData.filename);
+      return;
+    }
+
+    // Try to load large text file from IndexedDB
+    const db = await eegStore.openDB();
+    const tx = db.transaction([eegStore.storeName], 'readonly');
+    const store = tx.objectStore(eegStore.storeName);
+    const textResult = await new Promise((resolve, reject) => {
+      const request = store.get('current_text');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+
+    if (textResult && textResult.data) {
+      console.log("📄 Found text EEG file in IndexedDB:", textResult.filename);
+      await sendTextToFlaskAndPlot(textResult.data, textResult.filename);
+      return;
+    }
+
+  } catch (err) {
+    console.warn("⚠️ IndexedDB fallback failed or no data found:", err);
+  }
+
+  // Fallback to Chrome storage
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error("Storage access timeout after 10 seconds"));
@@ -51,14 +84,11 @@ async function loadAndProcessData() {
 
         try {
           if (result.eegDataType === "edf" && result.eegDataBuffer) {
-            console.log("🌐 Sending EDF to Flask API for preview...");
+            console.log("🌐 Sending EDF from Chrome storage to Flask...");
             await sendToFlaskAndPlot(result.eegDataBuffer, result.eegFileName);
           } else if (result.eegDataType === "text" && result.eegDataText) {
-            console.log("🌐 Sending text EEG to Flask API for preview...");
-            await sendTextToFlaskAndPlot(
-              result.eegDataText,
-              result.eegFileName
-            );
+            console.log("🌐 Sending text EEG from Chrome storage to Flask...");
+            await sendTextToFlaskAndPlot(result.eegDataText, result.eegFileName);
           } else {
             throw new Error("No EEG data found in storage");
           }
