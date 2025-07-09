@@ -28,163 +28,162 @@
   Author: EEG Reader Extension Team
 -->
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>EEG Plot Viewer</title>
-  
-  <!-- 
+  <head>
+    <meta charset="UTF-8" />
+    <title>EEG Plot Viewer</title>
+
+    <!-- 
     Plotly.js - Interactive charting library
     Used for creating interactive, zoomable EEG signal plots
     Features: zoom, pan, hover tooltips, responsive design
   -->
-  <script src="libs/plotly.min.js"></script>
-  
-  <!--
+    <script src="libs/plotly.min.js"></script>
+
+    <!--
     EEG Storage Helper - IndexedDB management
     Handles large file storage that exceeds Chrome storage limits
     Provides unified interface for both Chrome storage and IndexedDB
   -->
-  <script src="eegStorage.js"></script>
-  
-  <!--
+    <script src="eegStorage.js"></script>
+
+    <!--
     Enhanced CSS for full-screen plotting experience
     Removes all margins and padding to maximize plot area
     Adds loading states and error styling
   -->
-  <style>
-    /* 
+    <style>
+      /* 
       Remove all default browser styling for clean full-screen experience
       Sets up the page for a complete plotting interface
     */
-    body { 
-      margin: 0;                    /* Remove default browser margins */
-      padding: 0;                   /* Remove default browser padding */
-      font-family: Arial, sans-serif; /* Consistent font for any text elements */
-      background: #f5f5f5;          /* Light background for loading states */
-    }
-    
-    /*
+      body {
+        margin: 0; /* Remove default browser margins */
+        padding: 0; /* Remove default browser padding */
+        font-family: Arial, sans-serif; /* Consistent font for any text elements */
+        background: #f5f5f5; /* Light background for loading states */
+      }
+
+      /*
       Plot container takes up entire viewport
       This ensures the EEG visualization uses maximum screen real estate
     */
-    #plot { 
-      width: 100vw;   /* Full viewport width */
-      height: 100vh;  /* Full viewport height */
-      background: white; /* White background for plot area */
-    }
-    
-    /*
+      #plot {
+        width: 100vw; /* Full viewport width */
+        height: 100vh; /* Full viewport height */
+        background: white; /* White background for plot area */
+      }
+
+      /*
       Loading message styling
       Centers loading text and provides visual feedback
     */
-    .loading {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      font-size: 18px;
-      color: #666;
-    }
-    
-    /*
+      .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        font-size: 18px;
+        color: #666;
+      }
+
+      /*
       Error message container styling
       Provides clear error presentation with troubleshooting info
     */
-    .error-container {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      flex-direction: column;
-      padding: 20px;
-      text-align: center;
-    }
-    
-    .error-message {
-      font-size: 18px;
-      color: #d32f2f;
-      margin-bottom: 20px;
-      line-height: 1.4;
-      max-width: 600px;
-    }
-    
-    .troubleshooting {
-      margin-bottom: 20px;
-      padding: 15px;
-      background: #f0f0f0;
-      border-radius: 8px;
-      font-size: 14px;
-      max-width: 600px;
-      text-align: left;
-    }
-    
-    .technical-info {
-      margin-bottom: 20px;
-      padding: 15px;
-      background: #e3f2fd;
-      border-radius: 8px;
-      font-size: 12px;
-      max-width: 600px;
-      text-align: left;
-    }
-    
-    .action-buttons {
-      display: flex;
-      gap: 10px;
-    }
-    
-    .btn {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: background-color 0.3s;
-    }
-    
-    .btn-primary {
-      background: #2196F3;
-      color: white;
-    }
-    
-    .btn-primary:hover {
-      background: #1976D2;
-    }
-    
-    .btn-success {
-      background: #4CAF50;
-      color: white;
-    }
-    
-    .btn-success:hover {
-      background: #45a049;
-    }
-    
-    /*
+      .error-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        flex-direction: column;
+        padding: 20px;
+        text-align: center;
+      }
+
+      .error-message {
+        font-size: 18px;
+        color: #d32f2f;
+        margin-bottom: 20px;
+        line-height: 1.4;
+        max-width: 600px;
+      }
+
+      .troubleshooting {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f0f0f0;
+        border-radius: 8px;
+        font-size: 14px;
+        max-width: 600px;
+        text-align: left;
+      }
+
+      .technical-info {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #e3f2fd;
+        border-radius: 8px;
+        font-size: 12px;
+        max-width: 600px;
+        text-align: left;
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 10px;
+      }
+
+      .btn {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.3s;
+      }
+
+      .btn-primary {
+        background: #2196f3;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #1976d2;
+      }
+
+      .btn-success {
+        background: #4caf50;
+        color: white;
+      }
+
+      .btn-success:hover {
+        background: #45a049;
+      }
+
+      /*
       Responsive design for smaller screens
       Ensures error messages remain readable on mobile devices
     */
-    @media (max-width: 768px) {
-      .error-container {
-        padding: 10px;
+      @media (max-width: 768px) {
+        .error-container {
+          padding: 10px;
+        }
+
+        .error-message,
+        .troubleshooting,
+        .technical-info {
+          max-width: 90vw;
+          font-size: smaller;
+        }
+
+        .action-buttons {
+          flex-direction: column;
+          width: 100%;
+          max-width: 200px;
+        }
       }
-      
-      .error-message,
-      .troubleshooting,
-      .technical-info {
-        max-width: 90vw;
-        font-size: smaller;
-      }
-      
-      .action-buttons {
-        flex-direction: column;
-        width: 100%;
-        max-width: 200px;
-      }
-    }
-  </style>
-</head>
-<body>
+    </style>
+  </head>
   <!--
     Main plot container
     This div will be replaced by either:
@@ -197,22 +196,52 @@
     - Whether EEG data is available in storage
     - Whether the data can be successfully processed
   -->
-  <body>
-  <!-- Channel selector UI -->
-  <div style="padding: 10px; background: #f0f0f0;">
-    <label for="channelSelect">Select Channel:</label>
-    <select id="channelSelect" style="margin-left: 10px; padding: 5px;">
-      <option disabled selected>Loading channels...</option>
-    </select>
-  </div>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    "
+  >
+    <!-- Fixed top bar -->
+    <div
+      style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background: #f0f0f0;
+        padding: 10px 15px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        z-index: 10;
+      "
+    >
+      <label for="channelSelect" style="font-weight: bold"
+        >Select Channel:</label
+      >
+      <select id="channelSelect" style="margin-left: 10px; padding: 5px">
+        <option disabled selected>Loading channels...</option>
+      </select>
+    </div>
 
-  <!-- EEG plot container -->
-  <div id="plot" class="loading">
-    Loading EEG data...
-  </div>
+    <!-- Fullscreen Plot below the bar -->
+    <div
+      id="plot"
+      style="
+        position: absolute;
+        top: 50px;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+      "
+    >
+      <!-- Plotly chart renders here -->
+    </div>
 
-
-  <!--
+    <!--
     Main visualization script
     Enhanced version that handles:
     - Multiple storage sources (Chrome storage + IndexedDB)
@@ -221,6 +250,6 @@
     - Support for both text and binary EEG formats
     - Responsive design and performance optimization
   -->
-  <script src="viewer.js"></script>
-</body>
+    <script src="viewer.js"></script>
+  </body>
 </html>
