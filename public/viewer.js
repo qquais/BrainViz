@@ -40,12 +40,37 @@ async function initializeViewer() {
   const eegStore = new EEGStorage();
   const edfData = await eegStore.getEDFFile();
 
-  if (!edfData || !edfData.data) {
-    showError("No EEG data found in IndexedDB");
+  if (edfData && edfData.data) {
+    console.log("📦 Found EDF file in IndexedDB:", edfData.filename);
+    await sendToFlaskAndLoadSignals(edfData.data, edfData.filename);
     return;
   }
 
-  await sendToFlaskAndLoadSignals(edfData.data, edfData.filename);
+  // Fallback for text EEG from IndexedDB
+  try {
+    const db = await eegStore.openDB();
+    const tx = db.transaction(["eegFiles"], "readonly");
+    const store = tx.objectStore("eegFiles");
+
+    const textResult = await new Promise((resolve, reject) => {
+      const request = store.get("current_text");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    db.close();
+
+    if (textResult && textResult.data) {
+      console.log("📄 Found TXT EEG file in IndexedDB:", textResult.filename);
+      await sendTextToFlaskAndLoadSignals(textResult.data, textResult.filename || "eeg.txt");
+      return;
+    }
+
+    showError("No EEG data found in IndexedDB");
+  } catch (e) {
+    console.error("❌ Error checking text EEG fallback:", e);
+    showError("No EEG data found in IndexedDB");
+  }
 }
 
 async function sendToFlaskAndLoadSignals(bufferArray, fileName) {
@@ -70,17 +95,48 @@ async function sendToFlaskAndLoadSignals(bufferArray, fileName) {
     const result = await response.json();
     console.log("✅ EDF Preview from Flask:", result);
 
-    eegData = result;
-    sampleRate = result.sample_rate;
-    maxWindow = Math.floor(result.signals[0].length / sampleRate) - windowSize;
-
-    populateChannelDropdown(result.channel_names);
-    configureSlider();
-    plotCurrentWindow(); // first window
+    initializeData(result);
   } catch (error) {
-    console.error("❌ Error loading data:", error);
+    console.error("❌ Error loading EDF data:", error);
     showError(error.message);
   }
+}
+
+async function sendTextToFlaskAndLoadSignals(text, fileName) {
+  try {
+    const blob = new Blob([text], { type: "text/plain" });
+
+    const formData = new FormData();
+    formData.append("file", blob, fileName || "eeg.txt");
+
+    const response = await fetch("http://localhost:5000/txt-preview", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Flask error: ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log("✅ TXT EEG Preview from Flask:", result);
+
+    initializeData(result);
+  } catch (error) {
+    console.error("❌ Error loading TXT data:", error);
+    showError(error.message);
+  }
+}
+
+function initializeData(result) {
+  eegData = result;
+  sampleRate = result.sample_rate;
+  maxWindow = Math.floor(result.signals[0].length / sampleRate) - windowSize;
+
+  populateChannelDropdown(result.channel_names);
+  configureSlider();
+  plotCurrentWindow();
 }
 
 function populateChannelDropdown(channelNames) {
