@@ -205,11 +205,20 @@ function plotCurrentWindow() {
       x: 0.5,
       font: { size: 18 },
     },
-
-    xaxis: { title: "Time (s)" },
-    yaxis: { title: "Amplitude (µV)" },
-    margin: { l: 60, r: 40, t: 60, b: 50 },
-    height: window.innerHeight - 60,
+    xaxis: {
+      title: "Time (s)",
+      titlefont: { size: 14 },
+      tickfont: { size: 12 },
+      automargin: true,
+    },
+    yaxis: {
+      title: "Amplitude (µV)",
+      titlefont: { size: 14 },
+      tickfont: { size: 12 },
+      automargin: true,
+    },
+    margin: { l: 60, r: 40, t: 80, b: 80 }, // increased bottom margin
+    height: window.innerHeight - 80,
     showlegend: true,
   };
 
