@@ -2,6 +2,7 @@ let eegData = null;
 let sampleRate = 256;
 let windowSize = 10;
 let maxWindow = 0;
+let currentFileName = "Unknown File";
 
 console.log("🔧 EEG Viewer starting...");
 
@@ -42,11 +43,11 @@ async function initializeViewer() {
 
   if (edfData && edfData.data) {
     console.log("📦 Found EDF file in IndexedDB:", edfData.filename);
-    await sendToFlaskAndLoadSignals(edfData.data, edfData.filename);
+    currentFileName = edfData.filename || "Unknown File";
+    await sendToFlaskAndLoadSignals(edfData.data);
     return;
   }
 
-  // Fallback for text EEG from IndexedDB
   try {
     const db = await eegStore.openDB();
     const tx = db.transaction(["eegFiles"], "readonly");
@@ -62,7 +63,8 @@ async function initializeViewer() {
 
     if (textResult && textResult.data) {
       console.log("📄 Found TXT EEG file in IndexedDB:", textResult.filename);
-      await sendTextToFlaskAndLoadSignals(textResult.data, textResult.filename || "eeg.txt");
+      currentFileName = textResult.filename || "Unknown File";
+      await sendTextToFlaskAndLoadSignals(textResult.data);
       return;
     }
 
@@ -73,28 +75,24 @@ async function initializeViewer() {
   }
 }
 
-async function sendToFlaskAndLoadSignals(bufferArray, fileName) {
+async function sendToFlaskAndLoadSignals(bufferArray) {
   try {
     const blob = new Blob([new Uint8Array(bufferArray)], {
       type: "application/octet-stream",
     });
 
     const formData = new FormData();
-    formData.append("file", blob, fileName || "eeg.edf");
+    formData.append("file", blob, currentFileName);
 
     const response = await fetch("http://localhost:5000/edf-preview", {
       method: "POST",
       body: formData,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Flask error: ${errorText}`);
-    }
+    if (!response.ok) throw new Error(await response.text());
 
     const result = await response.json();
     console.log("✅ EDF Preview from Flask:", result);
-
     initializeData(result);
   } catch (error) {
     console.error("❌ Error loading EDF data:", error);
@@ -102,26 +100,22 @@ async function sendToFlaskAndLoadSignals(bufferArray, fileName) {
   }
 }
 
-async function sendTextToFlaskAndLoadSignals(text, fileName) {
+async function sendTextToFlaskAndLoadSignals(text) {
   try {
     const blob = new Blob([text], { type: "text/plain" });
 
     const formData = new FormData();
-    formData.append("file", blob, fileName || "eeg.txt");
+    formData.append("file", blob, currentFileName);
 
     const response = await fetch("http://localhost:5000/txt-preview", {
       method: "POST",
       body: formData,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Flask error: ${errorText}`);
-    }
+    if (!response.ok) throw new Error(await response.text());
 
     const result = await response.json();
     console.log("✅ TXT EEG Preview from Flask:", result);
-
     initializeData(result);
   } catch (error) {
     console.error("❌ Error loading TXT data:", error);
@@ -134,6 +128,7 @@ function initializeData(result) {
   sampleRate = result.sample_rate;
   maxWindow = Math.floor(result.signals[0].length / sampleRate) - windowSize;
 
+  document.getElementById("fileTitle").textContent = `File: ${currentFileName}`;
   populateChannelDropdown(result.channel_names);
   configureSlider();
   plotCurrentWindow();
@@ -150,7 +145,6 @@ function populateChannelDropdown(channelNames) {
     select.appendChild(opt);
   }
 
-  // Select first 3 channels by default
   for (let i = 0; i < Math.min(3, select.options.length); i++) {
     select.options[i].selected = true;
   }
@@ -178,7 +172,9 @@ function plotCurrentWindow() {
   const select = document.getElementById("channelSelect");
   const slider = document.getElementById("windowSlider");
 
-  const selectedChannels = Array.from(select.selectedOptions).map((opt) => opt.value);
+  const selectedChannels = Array.from(select.selectedOptions).map(
+    (opt) => opt.value
+  );
   const start = parseInt(slider.value) * sampleRate;
   const end = start + windowSize * sampleRate;
 
@@ -189,7 +185,10 @@ function plotCurrentWindow() {
     if (chIdx === -1) return;
 
     const signal = eegData.signals[chIdx].slice(start, end);
-    const time = Array.from({ length: signal.length }, (_, i) => (start + i) / sampleRate);
+    const time = Array.from(
+      { length: signal.length },
+      (_, i) => (start + i) / sampleRate
+    );
 
     traces.push({
       x: time,
@@ -202,10 +201,11 @@ function plotCurrentWindow() {
 
   const layout = {
     title: {
-      text: `EEG Channels: ${selectedChannels.join(", ")}`,
+      text: `File: ${currentFileName}`,
       x: 0.5,
       font: { size: 18 },
     },
+
     xaxis: { title: "Time (s)" },
     yaxis: { title: "Amplitude (µV)" },
     margin: { l: 60, r: 40, t: 60, b: 50 },
