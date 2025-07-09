@@ -52,10 +52,10 @@ async function loadAndProcessData() {
 
     // Try to load large text file from IndexedDB
     const db = await eegStore.openDB();
-    const tx = db.transaction([eegStore.storeName], 'readonly');
+    const tx = db.transaction([eegStore.storeName], "readonly");
     const store = tx.objectStore(eegStore.storeName);
     const textResult = await new Promise((resolve, reject) => {
-      const request = store.get('current_text');
+      const request = store.get("current_text");
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -66,7 +66,6 @@ async function loadAndProcessData() {
       await sendTextToFlaskAndPlot(textResult.data, textResult.filename);
       return;
     }
-
   } catch (err) {
     console.warn("⚠️ IndexedDB fallback failed or no data found:", err);
   }
@@ -88,7 +87,10 @@ async function loadAndProcessData() {
             await sendToFlaskAndPlot(result.eegDataBuffer, result.eegFileName);
           } else if (result.eegDataType === "text" && result.eegDataText) {
             console.log("🌐 Sending text EEG from Chrome storage to Flask...");
-            await sendTextToFlaskAndPlot(result.eegDataText, result.eegFileName);
+            await sendTextToFlaskAndPlot(
+              result.eegDataText,
+              result.eegFileName
+            );
           } else {
             throw new Error("No EEG data found in storage");
           }
@@ -134,14 +136,14 @@ async function sendToFlaskAndPlot(bufferArray, fileName) {
 
 async function sendTextToFlaskAndPlot(text, fileName) {
   try {
-    const blob = new Blob([text], { type: 'text/plain' });
+    const blob = new Blob([text], { type: "text/plain" });
 
     const formData = new FormData();
-    formData.append('file', blob, fileName || 'eeg.txt');
+    formData.append("file", blob, fileName || "eeg.txt");
 
-    const response = await fetch('http://localhost:5000/txt-preview', {
-      method: 'POST',
-      body: formData
+    const response = await fetch("http://localhost:5000/txt-preview", {
+      method: "POST",
+      body: formData,
     });
 
     if (!response.ok) {
@@ -150,15 +152,14 @@ async function sendTextToFlaskAndPlot(text, fileName) {
     }
 
     const result = await response.json();
-    console.log('✅ TXT EEG Preview from Flask:', result);
+    console.log("✅ TXT EEG Preview from Flask:", result);
 
     await plotPreviewEDF(result, fileName);
   } catch (error) {
-    console.error('❌ Error calling Flask API:', error);
+    console.error("❌ Error calling Flask API:", error);
     showError(error.message);
   }
 }
-
 
 function downsample(arr, factor = 10) {
   return arr.filter((_, i) => i % factor === 0);
@@ -192,9 +193,70 @@ async function plotPreviewEDF(data, fileName) {
     }
 
     await createPlot(traces, `Preview: ${fileName}`, true);
+    populateChannelDropdown(data.channel_names);
   } catch (error) {
     console.error("❌ EDF plotting failed:", error);
     showError("Plotting failed: " + error.message);
+  }
+}
+
+function populateChannelDropdown(channelNames) {
+  const select = document.getElementById("channelSelect");
+  if (!select) return;
+
+  select.innerHTML = ""; // Clear any existing options
+
+  for (const ch of channelNames) {
+    const opt = document.createElement("option");
+    opt.value = ch;
+    opt.textContent = ch;
+    select.appendChild(opt);
+  }
+
+  select.addEventListener("change", () => {
+    const selected = select.value;
+    requestChannelData(selected);
+  });
+}
+
+async function requestChannelData(channelName) {
+  try {
+    const response = await fetch("http://localhost:5000/edf-channel-data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: channelName }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Flask error: ${errorText}`);
+    }
+
+    const data = await response.json();
+    const x = Array.from(
+      { length: data.signal.length },
+      (_, i) => i / data.sample_rate
+    );
+
+    await Plotly.newPlot(
+      "plot",
+      [
+        {
+          x,
+          y: data.signal,
+          type: "scatter",
+          mode: "lines",
+          name: data.channel,
+        },
+      ],
+      {
+        title: `Channel: ${data.channel}`,
+        xaxis: { title: "Time (s)" },
+        yaxis: { title: "Amplitude" },
+      }
+    );
+  } catch (err) {
+    showError("Failed to fetch channel data: " + err.message);
   }
 }
 

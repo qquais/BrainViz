@@ -197,9 +197,20 @@
     - Whether EEG data is available in storage
     - Whether the data can be successfully processed
   -->
+  <body>
+  <!-- Channel selector UI -->
+  <div style="padding: 10px; background: #f0f0f0;">
+    <label for="channelSelect">Select Channel:</label>
+    <select id="channelSelect" style="margin-left: 10px; padding: 5px;">
+      <option disabled selected>Loading channels...</option>
+    </select>
+  </div>
+
+  <!-- EEG plot container -->
   <div id="plot" class="loading">
     Loading EEG data...
   </div>
+
 
   <!--
     Main visualization script
