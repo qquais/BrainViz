@@ -307,3 +307,52 @@ document.getElementById("plot").innerHTML = `
 `;
 
 console.log("✅ Viewer script loaded successfully");
+
+document.getElementById("psdButton").addEventListener("click", async () => {
+  try {
+    const res = await fetch("http://localhost:5000/psd", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        signals: eegData.signals,
+        sample_rate: sampleRate
+      }),
+    });
+
+    const result = await res.json();
+    if (result.error) throw new Error(result.error);
+
+    plotPSD(result.freqs, result.psd, eegData.channel_names);
+  } catch (err) {
+    console.error("❌ PSD error:", err);
+    alert("PSD Error: " + err.message);
+  }
+});
+
+function plotPSD(freqs, psd, channelNames) {
+  const traces = [];
+
+  psd.forEach((spectrum, i) => {
+    traces.push({
+      x: freqs,
+      y: spectrum,
+      type: "scatter",
+      mode: "lines",
+      name: channelNames[i]
+    });
+  });
+
+  const layout = {
+    title: { text: `Power Spectral Density`, x: 0.5 },
+    xaxis: { title: "Frequency (Hz)" },
+    yaxis: { title: "Power (dB)" },
+    height: window.innerHeight - 80,
+    showlegend: true,
+  };
+
+  Plotly.newPlot("plot", traces, layout, {
+    responsive: true,
+    displayModeBar: true,
+  });
+}
+

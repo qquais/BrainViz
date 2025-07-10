@@ -4,6 +4,7 @@ import mne
 import pandas as pd
 import numpy as np
 import io, os, struct, tempfile
+from mne.time_frequency import psd_array_welch
 
 
 app = Flask(__name__)
@@ -171,6 +172,23 @@ def txt_preview():
         return jsonify({"error": str(e)}), 500
     finally:
         os.remove(file_path)
+
+
+
+@app.route("/psd", methods=["POST"])
+def compute_psd():
+    try:
+        data = request.json
+        signals = np.array(data["signals"])  # shape: (n_channels, n_samples)
+        sfreq = float(data["sample_rate"])
+
+        psd, freqs = psd_array_welch(signals, sfreq=sfreq, fmin=0.5, fmax=50.0, n_fft=2048)
+        return jsonify({
+            "freqs": freqs.tolist(),
+            "psd": psd.tolist()  # shape: (n_channels, n_freqs)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
