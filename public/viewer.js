@@ -126,7 +126,7 @@ async function sendTextToFlaskAndLoadSignals(text) {
 function initializeData(result) {
   eegData = result;
   sampleRate = result.sample_rate;
-  maxWindow = Math.floor(result.signals[0].length / sampleRate) - windowSize;
+  maxWindow = Math.max(0, Math.floor(result.signals[0].length / sampleRate) - windowSize);
 
   document.getElementById("fileTitle").textContent = `File: ${currentFileName}`;
   populateChannelDropdown(result.channel_names);
@@ -158,6 +158,12 @@ function configureSlider() {
 
   slider.max = maxWindow;
   slider.value = 0;
+  slider.disabled = false; // Always keep enabled for UI clarity
+  slider.title = maxWindow <= 0
+    ? "This EEG signal is too short to scroll — full signal is shown."
+    : "Drag to view different time windows";
+
+  label.textContent = `0s–${windowSize}s`;
 
   slider.addEventListener("input", () => {
     const startSec = parseInt(slider.value);
@@ -165,7 +171,17 @@ function configureSlider() {
     plotCurrentWindow();
   });
 
-  label.textContent = `0s–${windowSize}s`;
+  // Add dynamic UX notice if signal is too short
+  const existingNote = document.getElementById("shortSignalNote");
+  if (maxWindow <= 0 && !existingNote) {
+    const note = document.createElement("div");
+    note.id = "shortSignalNote";
+    note.textContent = "ℹ️ Full signal shown — scrolling is disabled for short recordings.";
+    note.style.fontSize = "12px";
+    note.style.color = "#666";
+    note.style.marginTop = "4px";
+    slider.parentElement.appendChild(note);
+  }
 }
 
 function plotCurrentWindow() {
