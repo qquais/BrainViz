@@ -1,3 +1,9 @@
+let eegData = null;
+let sampleRate = 256;
+let windowSize = 10;
+let maxWindow = 0;
+let currentFileName = "Unknown File";
+
 console.log("🔧 EEG Viewer starting...");
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -31,204 +37,212 @@ async function initializeViewer() {
   if (typeof Plotly === "undefined") {
     throw new Error("Plotly.js library not loaded");
   }
-  console.log("✅ Plotly.js available");
 
-  await loadAndProcessData();
-}
+  const eegStore = new EEGStorage();
+  const edfData = await eegStore.getEDFFile();
 
-async function loadAndProcessData() {
-  console.log("📦 Loading EEG data from storage...");
+  if (edfData && edfData.data) {
+    console.log("📦 Found EDF file in IndexedDB:", edfData.filename);
+    currentFileName = edfData.filename || "Unknown File";
+    await sendToFlaskAndLoadSignals(edfData.data);
+    return;
+  }
 
   try {
-    const eegStore = new EEGStorage();
-
-    // Try to load EDF file from IndexedDB
-    const edfData = await eegStore.getEDFFile();
-    if (edfData && edfData.data) {
-      console.log("📦 Found EDF file in IndexedDB:", edfData.filename);
-      await sendToFlaskAndPlot(edfData.data, edfData.filename);
-      return;
-    }
-
-    // Try to load large text file from IndexedDB
     const db = await eegStore.openDB();
-    const tx = db.transaction([eegStore.storeName], 'readonly');
-    const store = tx.objectStore(eegStore.storeName);
+    const tx = db.transaction(["eegFiles"], "readonly");
+    const store = tx.objectStore("eegFiles");
+
     const textResult = await new Promise((resolve, reject) => {
-      const request = store.get('current_text');
+      const request = store.get("current_text");
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
+
     db.close();
 
     if (textResult && textResult.data) {
-      console.log("📄 Found text EEG file in IndexedDB:", textResult.filename);
-      await sendTextToFlaskAndPlot(textResult.data, textResult.filename);
+      console.log("📄 Found TXT EEG file in IndexedDB:", textResult.filename);
+      currentFileName = textResult.filename || "Unknown File";
+      await sendTextToFlaskAndLoadSignals(textResult.data);
       return;
     }
 
-  } catch (err) {
-    console.warn("⚠️ IndexedDB fallback failed or no data found:", err);
+    showError("No EEG data found in IndexedDB");
+  } catch (e) {
+    console.error("❌ Error checking text EEG fallback:", e);
+    showError("No EEG data found in IndexedDB");
   }
-
-  // Fallback to Chrome storage
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error("Storage access timeout after 10 seconds"));
-    }, 10000);
-
-    chrome.storage.local.get(
-      ["eegDataBuffer", "eegDataText", "eegDataType", "eegFileName"],
-      async (result) => {
-        clearTimeout(timeout);
-
-        try {
-          if (result.eegDataType === "edf" && result.eegDataBuffer) {
-            console.log("🌐 Sending EDF from Chrome storage to Flask...");
-            await sendToFlaskAndPlot(result.eegDataBuffer, result.eegFileName);
-          } else if (result.eegDataType === "text" && result.eegDataText) {
-            console.log("🌐 Sending text EEG from Chrome storage to Flask...");
-            await sendTextToFlaskAndPlot(result.eegDataText, result.eegFileName);
-          } else {
-            throw new Error("No EEG data found in storage");
-          }
-
-          resolve();
-        } catch (error) {
-          console.error("❌ Data processing error:", error);
-          reject(error);
-        }
-      }
-    );
-  });
 }
 
-async function sendToFlaskAndPlot(bufferArray, fileName) {
+async function sendToFlaskAndLoadSignals(bufferArray) {
   try {
     const blob = new Blob([new Uint8Array(bufferArray)], {
       type: "application/octet-stream",
     });
 
     const formData = new FormData();
-    formData.append("file", blob, fileName || "eeg.edf");
+    formData.append("file", blob, currentFileName);
 
     const response = await fetch("http://localhost:5000/edf-preview", {
       method: "POST",
       body: formData,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Flask error: ${errorText}`);
-    }
+    if (!response.ok) throw new Error(await response.text());
 
     const result = await response.json();
     console.log("✅ EDF Preview from Flask:", result);
-
-    await plotPreviewEDF(result, fileName);
+    initializeData(result);
   } catch (error) {
-    console.error("❌ Error calling Flask API:", error);
+    console.error("❌ Error loading EDF data:", error);
     showError(error.message);
   }
 }
 
-async function sendTextToFlaskAndPlot(text, fileName) {
+async function sendTextToFlaskAndLoadSignals(text) {
   try {
-    const blob = new Blob([text], { type: 'text/plain' });
+    const blob = new Blob([text], { type: "text/plain" });
 
     const formData = new FormData();
-    formData.append('file', blob, fileName || 'eeg.txt');
+    formData.append("file", blob, currentFileName);
 
-    const response = await fetch('http://localhost:5000/txt-preview', {
-      method: 'POST',
-      body: formData
+    const response = await fetch("http://localhost:5000/txt-preview", {
+      method: "POST",
+      body: formData,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Flask error: ${errorText}`);
-    }
+    if (!response.ok) throw new Error(await response.text());
 
     const result = await response.json();
-    console.log('✅ TXT EEG Preview from Flask:', result);
-
-    await plotPreviewEDF(result, fileName);
+    console.log("✅ TXT EEG Preview from Flask:", result);
+    initializeData(result);
   } catch (error) {
-    console.error('❌ Error calling Flask API:', error);
+    console.error("❌ Error loading TXT data:", error);
     showError(error.message);
   }
 }
 
+function initializeData(result) {
+  eegData = result;
+  sampleRate = result.sample_rate;
+  maxWindow = Math.max(0, Math.floor(result.signals[0].length / sampleRate) - windowSize);
 
-function downsample(arr, factor = 10) {
-  return arr.filter((_, i) => i % factor === 0);
+  document.getElementById("fileTitle").textContent = `File: ${currentFileName}`;
+  populateChannelDropdown(result.channel_names);
+  configureSlider();
+  plotCurrentWindow();
 }
 
-async function plotPreviewEDF(data, fileName) {
-  try {
-    const traces = [];
-    const timeAxis = Array.from(
-      { length: data.signals[0].length },
-      (_, i) => i / data.sample_rate
+function populateChannelDropdown(channelNames) {
+  const select = document.getElementById("channelSelect");
+  select.innerHTML = "";
+
+  for (const ch of channelNames) {
+    const opt = document.createElement("option");
+    opt.value = ch;
+    opt.textContent = ch;
+    select.appendChild(opt);
+  }
+
+  for (let i = 0; i < Math.min(3, select.options.length); i++) {
+    select.options[i].selected = true;
+  }
+
+  select.addEventListener("change", plotCurrentWindow);
+}
+
+function configureSlider() {
+  const slider = document.getElementById("windowSlider");
+  const label = document.getElementById("windowTimeLabel");
+
+  slider.max = maxWindow;
+  slider.value = 0;
+  slider.disabled = false; // Always keep enabled for UI clarity
+  slider.title = maxWindow <= 0
+    ? "This EEG signal is too short to scroll — full signal is shown."
+    : "Drag to view different time windows";
+
+  label.textContent = `0s–${windowSize}s`;
+
+  slider.addEventListener("input", () => {
+    const startSec = parseInt(slider.value);
+    label.textContent = `${startSec}s–${startSec + windowSize}s`;
+    plotCurrentWindow();
+  });
+
+  // Add dynamic UX notice if signal is too short
+  const existingNote = document.getElementById("shortSignalNote");
+  if (maxWindow <= 0 && !existingNote) {
+    const note = document.createElement("div");
+    note.id = "shortSignalNote";
+    note.textContent = "ℹ️ Full signal shown — scrolling is disabled for short recordings.";
+    note.style.fontSize = "12px";
+    note.style.color = "#666";
+    note.style.marginTop = "4px";
+    slider.parentElement.appendChild(note);
+  }
+}
+
+function plotCurrentWindow() {
+  const select = document.getElementById("channelSelect");
+  const slider = document.getElementById("windowSlider");
+
+  const selectedChannels = Array.from(select.selectedOptions).map(
+    (opt) => opt.value
+  );
+  const start = parseInt(slider.value) * sampleRate;
+  const end = start + windowSize * sampleRate;
+
+  const traces = [];
+
+  selectedChannels.forEach((ch) => {
+    const chIdx = eegData.channel_names.indexOf(ch);
+    if (chIdx === -1) return;
+
+    const signal = eegData.signals[chIdx].slice(start, end);
+    const time = Array.from(
+      { length: signal.length },
+      (_, i) => (start + i) / sampleRate
     );
 
-    for (let i = 0; i < Math.min(data.signals.length, 6); i++) {
-      const rawY = data.signals[i];
-      const factor = Math.ceil(rawY.length / 1000); // Downsample to ~1000 points
-      const y = downsample(rawY, factor);
-      const x = downsample(timeAxis, factor);
-      console.log(
-        `📉 Channel ${i}: raw=${rawY.length}, downsampled=${y.length}`
-      );
-
-      traces.push({
-        x,
-        y,
-        type: "scatter",
-        mode: "lines",
-        name: data.channel_names[i],
-        yaxis: `y${i + 1}`,
-      });
-    }
-
-    await createPlot(traces, `Preview: ${fileName}`, true);
-  } catch (error) {
-    console.error("❌ EDF plotting failed:", error);
-    showError("Plotting failed: " + error.message);
-  }
-}
-
-async function createPlot(traces, title, useSubplots) {
-  try {
-    const layout = {
-      title,
-      showlegend: true,
-      height: window.innerHeight,
-      margin: { l: 50, r: 50, t: 50, b: 50 },
-    };
-
-    if (useSubplots && traces.length > 1) {
-      const subplotHeight = 1 / traces.length;
-      for (let i = 0; i < traces.length; i++) {
-        layout[`yaxis${i + 1}`] = {
-          domain: [i * subplotHeight, (i + 1) * subplotHeight - 0.02],
-          title: traces[i].name,
-        };
-      }
-    } else {
-      layout.yaxis = { title: "Amplitude" };
-      layout.xaxis = { title: "Time (s)" };
-    }
-
-    await Plotly.newPlot("plot", traces, layout, {
-      responsive: true,
-      displayModeBar: true,
-      modeBarButtonsToRemove: ["lasso2d", "select2d"],
+    traces.push({
+      x: time,
+      y: signal,
+      type: "scatter",
+      mode: "lines",
+      name: ch,
     });
-  } catch (error) {
-    console.error("❌ Plot creation failed:", error);
-    showError("Plot error: " + error.message);
-  }
+  });
+
+  const layout = {
+    title: {
+      text: `File: ${currentFileName}`,
+      x: 0.5,
+      font: { size: 18 },
+    },
+    xaxis: {
+      title: "Time (s)",
+      titlefont: { size: 14 },
+      tickfont: { size: 12 },
+      automargin: true,
+    },
+    yaxis: {
+      title: "Amplitude (µV)",
+      titlefont: { size: 14 },
+      tickfont: { size: 12 },
+      automargin: true,
+    },
+    margin: { l: 60, r: 40, t: 80, b: 80 }, // increased bottom margin
+    height: window.innerHeight - 80,
+    showlegend: true,
+  };
+
+  Plotly.newPlot("plot", traces, layout, {
+    responsive: true,
+    displayModeBar: true,
+    modeBarButtonsToRemove: ["lasso2d", "select2d"],
+  });
 }
 
 function showError(message) {
@@ -250,7 +264,6 @@ function showError(message) {
   `;
 }
 
-// Initial loading state
 document.getElementById("plot").innerHTML = `
   <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 18px; color: #666;">
     🧠 Loading EEG data...
