@@ -126,12 +126,46 @@ async function sendTextToFlaskAndLoadSignals(text) {
 function initializeData(result) {
   eegData = result;
   sampleRate = result.sample_rate;
-  maxWindow = Math.max(0, Math.floor(result.signals[0].length / sampleRate) - windowSize);
+  maxWindow = Math.max(
+    0,
+    Math.floor(result.signals[0].length / sampleRate) - windowSize
+  );
 
   document.getElementById("fileTitle").textContent = `File: ${currentFileName}`;
   populateChannelDropdown(result.channel_names);
   configureSlider();
   plotCurrentWindow();
+  document.getElementById("applyFilter").addEventListener("click", async () => {
+    const type = document.getElementById("filterType").value;
+    if (type === "none") return;
+
+    const l_freq = parseFloat(document.getElementById("lowFreq").value || "0");
+    const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
+
+    try {
+      const res = await fetch("http://localhost:5000/filter-signal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signals: eegData.signals,
+          sample_rate: sampleRate,
+          filter_type: type,
+          l_freq: isNaN(l_freq) ? null : l_freq,
+          h_freq: isNaN(h_freq) ? null : h_freq,
+        }),
+      });
+
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+
+      eegData.signals = result.filtered;
+      plotCurrentWindow();
+      alert("✅ Filter applied!");
+    } catch (err) {
+      console.error("❌ Filtering failed:", err);
+      alert("Error applying filter: " + err.message);
+    }
+  });
 }
 
 function populateChannelDropdown(channelNames) {
@@ -159,9 +193,10 @@ function configureSlider() {
   slider.max = maxWindow;
   slider.value = 0;
   slider.disabled = false; // Always keep enabled for UI clarity
-  slider.title = maxWindow <= 0
-    ? "This EEG signal is too short to scroll — full signal is shown."
-    : "Drag to view different time windows";
+  slider.title =
+    maxWindow <= 0
+      ? "This EEG signal is too short to scroll — full signal is shown."
+      : "Drag to view different time windows";
 
   label.textContent = `0s–${windowSize}s`;
 
@@ -176,7 +211,8 @@ function configureSlider() {
   if (maxWindow <= 0 && !existingNote) {
     const note = document.createElement("div");
     note.id = "shortSignalNote";
-    note.textContent = "ℹ️ Full signal shown — scrolling is disabled for short recordings.";
+    note.textContent =
+      "ℹ️ Full signal shown — scrolling is disabled for short recordings.";
     note.style.fontSize = "12px";
     note.style.color = "#666";
     note.style.marginTop = "4px";

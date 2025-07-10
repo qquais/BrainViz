@@ -222,6 +222,28 @@
         flex-wrap: wrap;
       "
     >
+      <label for="filterType" style="font-weight: bold">Filter:</label>
+      <select id="filterType" style="padding: 4px">
+        <option value="none">None</option>
+        <option value="bandpass">Bandpass</option>
+        <option value="highpass">High-pass</option>
+        <option value="lowpass">Low-pass</option>
+        <option value="notch">Notch</option>
+      </select>
+      <input
+        type="number"
+        id="lowFreq"
+        placeholder="Low Freq"
+        style="width: 80px"
+      />
+      <input
+        type="number"
+        id="highFreq"
+        placeholder="High Freq"
+        style="width: 80px"
+      />
+      <button id="applyFilter" class="btn btn-success">Apply Filter</button>
+
       <label for="channelSelect" style="font-weight: bold">Channels:</label>
       <select
         id="channelSelect"

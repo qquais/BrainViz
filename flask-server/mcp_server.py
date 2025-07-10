@@ -76,7 +76,28 @@ def get_channel_data():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
+
+
+@app.route("/filter-signal", methods=["POST"])
+def filter_signal():
+    try:
+        data = request.json
+        signals = np.array(data["signals"])
+        sfreq = float(data["sample_rate"])
+        filter_type = data["filter_type"]
+        l_freq = data.get("l_freq")
+        h_freq = data.get("h_freq")
+
+        if filter_type == "notch":
+            freqs = l_freq if isinstance(l_freq, list) else [l_freq]
+            filtered = mne.filter.notch_filter(signals, sfreq, freqs=freqs)
+        else:
+            filtered = mne.filter.filter_data(signals, sfreq, l_freq, h_freq, method="iir")
+
+        return jsonify({"filtered": filtered.tolist()})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+      
 @app.route('/txt-preview', methods=['POST'])
 def txt_preview():
     if 'file' not in request.files:
