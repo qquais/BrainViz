@@ -6,7 +6,6 @@ import numpy as np
 import io, os, struct, tempfile
 from mne.time_frequency import psd_array_welch
 
-
 app = Flask(__name__)
 CORS(app)
 
@@ -49,6 +48,7 @@ def edf_preview():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+        
 
 @app.route('/edf-channel-data', methods=['POST'])
 def get_channel_data():

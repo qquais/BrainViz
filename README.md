@@ -1,6 +1,6 @@
 # 🧠 EEG Reader - Chrome Extension
 
-**EEG Reader** is a Chrome extension that automatically detects, intercepts, and visualizes EEG signal files directly in the browser. It supports `.txt`, `.edf`, `.csv`, and `.zip` EEG data formats and provides an intuitive interface for both automatic and manual visualization.
+**EEG Reader** is a Chrome extension that automatically detects, intercepts, and visualizes EEG signal files directly in the browser. It supports `.txt`, `.edf` EEG data formats and provides an intuitive interface for both automatic and manual visualization.
 
 ---
 
@@ -54,12 +54,12 @@
 
 ### 1. Auto-Intercept EEG Downloads
 - Visit a site such as [PhysioNet](https://physionet.org/)
-- Click on a `.txt`, `.edf`, `.csv`, or `.zip` EEG file
+- Click on a `.txt`, `.edf` EEG file
 - Extension intercepts the download and opens the viewer in a new tab
 
 ### 2. Upload EEG Files Manually
 - Click the EEG Reader icon in the Chrome toolbar
-- In the popup, click the upload area and choose a `.txt` file
+- In the popup, click the upload area and choose a `.txt` or `.edf` file
 - EEG Viewer will open in a new tab with plotted data
 
 ---
@@ -101,9 +101,7 @@ Time,Signal
 
 ## ⚠️ Known Issues
 
-- Viewer only loads `.txt` manually (intercept handles `.edf`, `.csv`, `.zip`)
-- Does not support multi-channel EEG yet
-- Interception may fail if page disables content scripts or uses custom download logic
+- Interception may fail if page disables content scripts or uses custom download logic.
 
 ---
 

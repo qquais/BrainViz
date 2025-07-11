@@ -36,13 +36,11 @@ if (window.eegInterceptorInitialized) {
     // Remove query parameters for checking
     const urlWithoutParams = url.split('?')[0];
     const hasEEGExtension = urlWithoutParams.endsWith('.txt') || 
-                           urlWithoutParams.endsWith('.zip') || 
                            urlWithoutParams.endsWith('.edf') ||
                            urlWithoutParams.endsWith('.csv');
     
     // Also check if URL contains EEG-related patterns
     const hasEEGPattern = url.includes('.txt') || 
-                         url.includes('.zip') || 
                          url.includes('eeg') ||
                          url.includes('EEG') ||
                          url.includes('RECORDS');
@@ -50,7 +48,8 @@ if (window.eegInterceptorInitialized) {
     // Check for download parameter (PhysioNet style)
     const hasDownloadParam = url.includes('?download') || url.includes('&download');
     
-    const isEEG = hasEEGExtension || (hasEEGPattern && hasDownloadParam);
+    // const isEEG = hasEEGExtension || (hasEEGPattern && hasDownloadParam);
+    const isEEG = hasEEGExtension && hasDownloadParam;
     
     console.log("🔍 URL analysis:", {
       url: url,

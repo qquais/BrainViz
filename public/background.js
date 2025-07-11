@@ -8,7 +8,6 @@ function isEEGDownload(url) {
 
   const hasEEGExtension =
     urlLower.endsWith(".txt") ||
-    urlLower.endsWith(".zip") ||
     urlLower.endsWith(".edf") ||
     urlLower.endsWith(".csv");
 
@@ -34,7 +33,6 @@ function isEEGDownload(url) {
   if (hasNonEEGPatterns) return false;
   if (urlLower.endsWith(".txt") && !hasEEGPatterns) return false;
   if (urlLower.endsWith(".txt") && hasEEGPatterns) return true;
-  if (urlLower.endsWith(".zip")) return true;
 
   return false;
 }
@@ -139,7 +137,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
-  // ✅ NEW: Handles .txt EEG files from contentScript.js
   else if (msg.action === "storeTextEEG") {
     console.log("📨 Background: storing text EEG from content script");
 
@@ -160,7 +157,33 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       }
     })();
 
-    return true; // Keep service worker alive until async is done
+    return true;
+  }
+
+  // ✅ NEW handler for EDF from content script
+  else if (msg.action === "storeEDFURL") {
+    console.log("📡 Fetching EDF file from URL:", msg.url);
+
+    (async () => {
+      try {
+        const response = await fetch(msg.url);
+        const buffer = await response.arrayBuffer();
+
+        const eegStorage = new EEGStorage();
+        await eegStorage.clearAllData();
+        await eegStorage.storeEDFFile(buffer, msg.filename);
+
+        console.log("✅ Stored EDF file. Opening viewer...");
+        chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") }, () => {
+          sendResponse({ success: true });
+        });
+      } catch (err) {
+        console.error("❌ Failed to fetch/store EDF:", err);
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+
+    return true;
   }
 });
 

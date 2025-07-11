@@ -37,6 +37,11 @@ function isValidEEGText(text) {
   return true;
 }
 
+function isValidEEGEDF(buffer) {
+  // Basic check: EDF files usually have a 256-byte header and some binary data
+  return buffer.byteLength > 512;
+}
+
 function initializeEEGInterceptor() {
   console.log("🔧 Initializing EEG interceptor...");
 
@@ -59,75 +64,81 @@ function initializeEEGInterceptor() {
 
   const processedMessages = new Set();
 
-  window.addEventListener("message", async (event) => {
-    if (event.source !== window || event.data.type !== "EEG_INTERCEPT") return;
+window.addEventListener("message", async (event) => {
+  if (event.source !== window || event.data.type !== "EEG_INTERCEPT") return;
 
-    const href = event.data.href;
-    if (processedMessages.has(href)) {
-      console.log("⏭️ Already processing this URL, skipping:", href);
-      return;
-    }
+  const href = event.data.href;
+  if (processedMessages.has(href)) {
+    console.log("⏭️ Already processing this URL, skipping:", href);
+    return;
+  }
 
-    processedMessages.add(href);
-    setTimeout(() => processedMessages.delete(href), 5000);
+  processedMessages.add(href);
+  setTimeout(() => processedMessages.delete(href), 5000);
 
-    console.log("📥 Content script received intercept message:", href);
+  console.log("📥 Content script received intercept message:", href);
 
-    if (!isExtensionContextValid()) {
-      console.error("❌ Extension context invalid, cannot process:", href);
-      alert(`EEG Extension: Context lost. Please reload and try again.`);
-      return;
-    }
+  if (!isExtensionContextValid()) {
+    console.error("❌ Extension context invalid, cannot process:", href);
+    alert(`EEG Extension: Context lost. Please reload and try again.`);
+    return;
+  }
 
-    try {
-      const store = await new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => reject(new Error("Timeout")), 5000);
-        chrome.storage.local.get(["interceptEnabled"], (data) => {
-          clearTimeout(timeoutId);
-          chrome.runtime.lastError ? reject(chrome.runtime.lastError) : resolve(data);
-        });
-      });
+  const fileName = href.split("/").pop().split("?")[0].toLowerCase();
 
-      if (store.interceptEnabled === false) {
-        console.log("⏭️ Interception disabled, skipping");
-        return;
-      }
+  try {
+    const response = await fetch(href, {
+      method: "GET",
+      mode: "cors",
+      cache: "no-cache",
+      credentials: "omit",
+      headers: { Accept: "*/*" },
+    });
 
-      const response = await fetch(href, {
-        method: "GET",
-        mode: "cors",
-        cache: "no-cache",
-        credentials: "omit",
-        headers: { Accept: "text/plain,*/*" },
-      });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const text = await response.text();
-      console.log("📄 Fetched text length:", text.length);
-
-      const cleanFileName = href.split("/").pop().split("?")[0].toLowerCase();
-
-      if (!isValidEEGText(text)) {
-        console.log("⏭️ Not valid EEG content. Allowing normal download:", cleanFileName);
+    if (fileName.endsWith(".edf")) {
+      const buffer = await response.arrayBuffer();
+      if (!isValidEEGEDF(buffer)) {
+        console.log("⏭️ Invalid EDF — fallback download");
         window.location.href = href;
         return;
       }
 
-      // ✅ Valid EEG, send to background for storage
+      chrome.runtime.sendMessage({
+        action: "storeEDFURL",
+        url: href,
+        filename: fileName,
+      }, (res) => {
+        console.log("📨 Background response:", res);
+      });
+
+    } else if (fileName.endsWith(".txt")) {
+      const text = await response.text();
+      if (!isValidEEGText(text)) {
+        console.log("⏭️ Not valid EEG text — fallback download:", fileName);
+        window.location.href = href;
+        return;
+      }
+
       chrome.runtime.sendMessage({
         action: "storeTextEEG",
         text,
-        filename: cleanFileName
+        filename: fileName,
       }, (res) => {
-        console.log("📨 Background responded:", res);
+        console.log("📨 Background response:", res);
       });
 
-    } catch (err) {
-      console.error("❌ Intercept failed:", err);
-      alert(`EEG Extension Error: ${err.message}`);
+    } else {
+      console.log("❌ Unsupported file type:", fileName);
+      window.location.href = href;
     }
-  });
+
+  } catch (err) {
+    console.error("❌ Intercept failed:", err);
+    alert(`EEG Extension Error: ${err.message}`);
+  }
+});
 }
 
 if (document.readyState === "loading") {
