@@ -310,11 +310,16 @@ console.log("✅ Viewer script loaded successfully");
 
 document.getElementById("psdButton").addEventListener("click", async () => {
   try {
+    const select = document.getElementById("channelSelect");
+    const selected = Array.from(select.selectedOptions).map(opt => opt.value);
+    const selectedIndices = selected.map(ch => eegData.channel_names.indexOf(ch));
+    const selectedSignals = selectedIndices.map(i => eegData.signals[i]);
+
     const res = await fetch("http://localhost:5000/psd", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        signals: eegData.signals,
+        signals: selectedSignals,
         sample_rate: sampleRate
       }),
     });
@@ -322,7 +327,7 @@ document.getElementById("psdButton").addEventListener("click", async () => {
     const result = await res.json();
     if (result.error) throw new Error(result.error);
 
-    plotPSD(result.freqs, result.psd, eegData.channel_names);
+    plotPSD(result.freqs, result.psd, selected);
   } catch (err) {
     console.error("❌ PSD error:", err);
     alert("PSD Error: " + err.message);
@@ -355,4 +360,5 @@ function plotPSD(freqs, psd, channelNames) {
     displayModeBar: true,
   });
 }
+
 
