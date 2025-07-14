@@ -111,6 +111,11 @@
       font-size: 18px;
       color: #666;
     }
+
+    #psdPlot {
+      display: none;
+      padding: 20px;
+    }
   </style>
 </head>
 <body>
@@ -131,7 +136,9 @@
       <div class="loading">🧠 Loading EEG data...</div>
     </div>
 
-    <!-- Combined sticky bottom control bar -->
+    <div id="psdPlot"></div>
+
+    <!-- Bottom control bar -->
     <div id="bottomControls">
       <select id="filterType">
         <option value="none">None</option>
@@ -147,6 +154,8 @@
       <label for="windowSlider"><strong>Time Window:</strong></label>
       <input type="range" id="windowSlider" min="0" max="100" step="1" value="0" />
       <span id="windowTimeLabel">0–10s</span>
+
+      <button id="showPsdBtn">Show PSD</button>
     </div>
   </div>
 

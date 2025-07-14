@@ -3,7 +3,8 @@ let sampleRate = 256;
 let windowSize = 10;
 let maxWindow = 0;
 let currentFileName = "Unknown File";
-let isStackedView = true; // ✅ default view is stacked
+let isStackedView = true;
+let psdVisible = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
@@ -135,6 +136,8 @@ function initializeData(result) {
       alert("Error applying filter: " + err.message);
     }
   });
+
+  document.getElementById("showPsdBtn").addEventListener("click", handlePsdToggle);
 }
 
 function populateChannelList(channelNames) {
@@ -174,7 +177,7 @@ function configureSlider() {
 
 function plotCurrentWindow() {
   const plotDiv = document.getElementById("plot");
-  plotDiv.innerHTML = ""; // clear old content or loading div
+  plotDiv.innerHTML = "";
 
   const slider = document.getElementById("windowSlider");
   const selectedChannels = Array.from(
@@ -246,6 +249,57 @@ function plotCurrentWindow() {
     };
 
     Plotly.newPlot("plot", traces, layout, { responsive: true });
+  }
+}
+
+async function handlePsdToggle() {
+  const selectedChannels = Array.from(
+    document.querySelectorAll("#channelList input:checked")
+  ).map(cb => cb.value);
+
+  if (!psdVisible) {
+    try {
+      const res = await fetch("http://localhost:5000/psd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signals: eegData.signals,
+          channel_names: eegData.channel_names,
+          selected_channels: selectedChannels,
+          sample_rate: sampleRate,
+        }),
+      });
+
+      const psdData = await res.json();
+      if (psdData.error) throw new Error(psdData.error);
+
+      const traces = psdData.psd.map((spectrum, i) => ({
+        x: psdData.freqs,
+        y: spectrum,
+        type: "scatter",
+        mode: "lines",
+        name: selectedChannels[i],
+      }));
+
+      Plotly.newPlot("psdPlot", traces, {
+        title: { text: "Power Spectral Density (PSD)", x: 0.5 },
+        xaxis: { title: "Frequency (Hz)" },
+        yaxis: { title: "Power (dB/Hz)" },
+        height: 400,
+        margin: { l: 60, r: 40, t: 40, b: 60 },
+        showlegend: true
+      });
+
+      document.getElementById("psdPlot").style.display = "block";
+      document.getElementById("showPsdBtn").textContent = "Hide PSD";
+      psdVisible = true;
+    } catch (err) {
+      alert("PSD Error: " + err.message);
+    }
+  } else {
+    document.getElementById("psdPlot").style.display = "none";
+    document.getElementById("showPsdBtn").textContent = "Show PSD";
+    psdVisible = false;
   }
 }
 
