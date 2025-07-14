@@ -140,6 +140,7 @@ function initializeData(result) {
   document.getElementById("showPsdBtn").addEventListener("click", handlePsdToggle);
 }
 
+
 function populateChannelList(channelNames) {
   const container = document.getElementById("channelList");
   if (!container) return;
@@ -151,13 +152,24 @@ function populateChannelList(channelNames) {
     input.type = "checkbox";
     input.value = ch;
     input.checked = true;
-    input.addEventListener("change", plotCurrentWindow);
+
+    input.addEventListener("change", () => {
+      plotCurrentWindow();
+
+      if (psdVisible) {
+        const selected = Array.from(
+          document.querySelectorAll("#channelList input:checked")
+        ).map(cb => cb.value);
+        updatePSDPlot(selected);
+      }
+    });
 
     label.appendChild(input);
     label.appendChild(document.createTextNode(ch));
     container.appendChild(label);
   });
 }
+
 
 function configureSlider() {
   const slider = document.getElementById("windowSlider");
@@ -257,51 +269,61 @@ async function handlePsdToggle() {
     document.querySelectorAll("#channelList input:checked")
   ).map(cb => cb.value);
 
+  if (!selectedChannels.length) {
+    alert("Select at least one channel to view PSD");
+    return;
+  }
+
   if (!psdVisible) {
-    try {
-      const res = await fetch("http://localhost:5000/psd", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          signals: eegData.signals,
-          channel_names: eegData.channel_names,
-          selected_channels: selectedChannels,
-          sample_rate: sampleRate,
-        }),
-      });
-
-      const psdData = await res.json();
-      if (psdData.error) throw new Error(psdData.error);
-
-      const traces = psdData.psd.map((spectrum, i) => ({
-        x: psdData.freqs,
-        y: spectrum,
-        type: "scatter",
-        mode: "lines",
-        name: selectedChannels[i],
-      }));
-
-      Plotly.newPlot("psdPlot", traces, {
-        title: { text: "Power Spectral Density (PSD)", x: 0.5 },
-        xaxis: { title: "Frequency (Hz)" },
-        yaxis: { title: "Power (dB/Hz)" },
-        height: 400,
-        margin: { l: 60, r: 40, t: 40, b: 60 },
-        showlegend: true
-      });
-
-      document.getElementById("psdPlot").style.display = "block";
-      document.getElementById("showPsdBtn").textContent = "Hide PSD";
-      psdVisible = true;
-    } catch (err) {
-      alert("PSD Error: " + err.message);
-    }
+    await updatePSDPlot(selectedChannels);
+    document.getElementById("psdPlot").style.display = "block";
+    document.getElementById("showPsdBtn").textContent = "Hide PSD";
+    psdVisible = true;
   } else {
     document.getElementById("psdPlot").style.display = "none";
     document.getElementById("showPsdBtn").textContent = "Show PSD";
     psdVisible = false;
   }
 }
+
+async function updatePSDPlot(selectedChannels) {
+  try {
+    const selectedIndices = selectedChannels.map(ch => eegData.channel_names.indexOf(ch));
+    const selectedSignals = selectedIndices.map(i => eegData.signals[i]);
+
+    const res = await fetch("http://localhost:5000/psd", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        signals: selectedSignals,
+        sample_rate: sampleRate,
+      }),
+    });
+
+    const psdData = await res.json();
+    if (psdData.error) throw new Error(psdData.error);
+
+    const traces = psdData.psd.map((spectrum, i) => ({
+      x: psdData.freqs,
+      y: spectrum,
+      type: "scatter",
+      mode: "lines",
+      name: selectedChannels[i],
+    }));
+
+    Plotly.newPlot("psdPlot", traces, {
+      title: { text: "Power Spectral Density (PSD)", x: 0.5 },
+      xaxis: { title: "Frequency (Hz)" },
+      yaxis: { title: "Power (dB/Hz)" },
+      height: 400,
+      margin: { l: 60, r: 40, t: 40, b: 60 },
+      showlegend: true
+    });
+  } catch (err) {
+    alert("PSD Error: " + err.message);
+  }
+}
+
 
 function showError(message) {
   const plotDiv = document.getElementById("plot");
