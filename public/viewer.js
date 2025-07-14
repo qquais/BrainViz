@@ -3,7 +3,7 @@ let sampleRate = 256;
 let windowSize = 10;
 let maxWindow = 0;
 let currentFileName = "Unknown File";
-let isStackedView = false;
+let isStackedView = true; // ✅ default view is stacked
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
@@ -95,13 +95,13 @@ function initializeData(result) {
   document.getElementById("fileLabel").textContent = `File: ${currentFileName}`;
   populateChannelList(result.channel_names);
   configureSlider();
+  document.getElementById("toggleViewBtn").textContent = "Switch to Compact View";
   plotCurrentWindow();
 
   document.getElementById("toggleViewBtn").onclick = () => {
     isStackedView = !isStackedView;
-    document.getElementById("toggleViewBtn").textContent = isStackedView
-      ? "Switch to Compact View"
-      : "Switch to Stacked View";
+    document.getElementById("toggleViewBtn").textContent =
+      isStackedView ? "Switch to Compact View" : "Switch to Stacked View";
     plotCurrentWindow();
   };
 
@@ -174,7 +174,7 @@ function configureSlider() {
 
 function plotCurrentWindow() {
   const plotDiv = document.getElementById("plot");
-  plotDiv.innerHTML = ""; // ✅ Clear any loading or leftover elements
+  plotDiv.innerHTML = ""; // clear old content or loading div
 
   const slider = document.getElementById("windowSlider");
   const selectedChannels = Array.from(
@@ -189,7 +189,7 @@ function plotCurrentWindow() {
     const layout = {
       title: { text: `EEG Signal (Stacked)`, x: 0.5 },
       grid: { rows: selectedChannels.length, columns: 1, pattern: "independent" },
-      height: Math.max(selectedChannels.length * 100, 500), // ✅ min height to reduce white space
+      height: Math.max(selectedChannels.length * 100, 500),
       margin: { l: 60, r: 20, t: 40, b: 40 },
       showlegend: false,
     };
