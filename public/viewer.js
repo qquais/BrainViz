@@ -150,6 +150,7 @@ function initializeData(result) {
 }
 
 function populateChannelList(channelNames) {
+  setupChannelToggleButtons();
   const container = document.getElementById("channelList");
   if (!container) return;
   container.innerHTML = "";
@@ -355,6 +356,27 @@ async function updatePSDPlot(selectedChannels) {
   } catch (err) {
     alert("PSD Error: " + err.message);
   }
+}
+
+function setupChannelToggleButtons() {
+  const selectAllBtn = document.getElementById("selectAllBtn");
+  const unselectAllBtn = document.getElementById("unselectAllBtn");
+
+  selectAllBtn.addEventListener("click", () => {
+    document.querySelectorAll("#channelList input[type='checkbox']").forEach(cb => cb.checked = true);
+    plotCurrentWindow();
+    if (psdVisible) updatePSDPlot(getSelectedChannels());
+  });
+
+  unselectAllBtn.addEventListener("click", () => {
+    document.querySelectorAll("#channelList input[type='checkbox']").forEach(cb => cb.checked = false);
+    plotCurrentWindow();
+    if (psdVisible) updatePSDPlot(getSelectedChannels());
+  });
+}
+
+function getSelectedChannels() {
+  return Array.from(document.querySelectorAll("#channelList input:checked")).map(cb => cb.value);
 }
 
 function showError(message) {

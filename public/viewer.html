@@ -31,6 +31,25 @@
       color: #2c3e50;
     }
 
+    #channelButtons {
+      margin-bottom: 10px;
+    }
+
+    #channelButtons button {
+      background: #2196f3;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      margin-right: 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    #channelButtons button:hover {
+      background: #1976d2;
+    }
+
     #channelList label {
       display: block;
       margin-bottom: 6px;
@@ -126,6 +145,10 @@
   <!-- Sidebar -->
   <div id="sidebar">
     <h2>Channels</h2>
+    <div id="channelButtons">
+      <button id="selectAllBtn">Select All</button>
+      <button id="unselectAllBtn">Unselect All</button>
+    </div>
     <div id="channelList"></div>
   </div>
 
