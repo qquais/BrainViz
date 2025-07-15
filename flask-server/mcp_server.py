@@ -184,6 +184,9 @@ def compute_psd():
         signals = np.array(data["signals"])
         sfreq = float(data["sample_rate"])
 
+        if signals.size == 0 or signals.shape[0] == 0:
+            return jsonify({"error": "No channels selected for PSD."}), 400
+
         n_samples = signals.shape[1]
         safe_n_fft = min(2048, n_samples)
 

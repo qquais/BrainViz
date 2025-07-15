@@ -287,8 +287,18 @@ async function handlePsdToggle() {
 }
 
 async function updatePSDPlot(selectedChannels) {
+  const psdDiv = document.getElementById("psdPlot");
+  psdDiv.innerHTML = ""; // ✅ Clear any previous plot
+
+  if (!selectedChannels.length) {
+    alert("⚠️ Please select at least one channel to compute PSD.");
+    return;
+  }
+
   try {
-    const selectedIndices = selectedChannels.map(ch => eegData.channel_names.indexOf(ch));
+    const selectedIndices = selectedChannels.map(ch =>
+      eegData.channel_names.indexOf(ch)
+    );
     const selectedSignals = selectedIndices.map(i => eegData.signals[i]);
 
     const res = await fetch("http://localhost:5000/psd", {
@@ -299,6 +309,8 @@ async function updatePSDPlot(selectedChannels) {
         sample_rate: sampleRate,
       }),
     });
+
+    if (!res.ok) throw new Error(await res.text());
 
     const psdData = await res.json();
     if (psdData.error) throw new Error(psdData.error);
@@ -317,13 +329,12 @@ async function updatePSDPlot(selectedChannels) {
       yaxis: { title: "Power (dB/Hz)" },
       height: 400,
       margin: { l: 60, r: 40, t: 40, b: 60 },
-      showlegend: true
+      showlegend: true,
     });
   } catch (err) {
     alert("PSD Error: " + err.message);
   }
 }
-
 
 function showError(message) {
   const plotDiv = document.getElementById("plot");
