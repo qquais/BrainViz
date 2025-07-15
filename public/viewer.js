@@ -51,7 +51,9 @@ async function initializeViewer() {
 
 async function sendToFlaskAndLoadSignals(bufferArray) {
   try {
-    const blob = new Blob([new Uint8Array(bufferArray)], { type: "application/octet-stream" });
+    const blob = new Blob([new Uint8Array(bufferArray)], {
+      type: "application/octet-stream",
+    });
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
@@ -92,17 +94,22 @@ async function sendTextToFlaskAndLoadSignals(text) {
 function initializeData(result) {
   eegData = result;
   sampleRate = result.sample_rate;
-  maxWindow = Math.max(0, Math.floor(result.signals[0].length / sampleRate) - windowSize);
+  maxWindow = Math.max(
+    0,
+    Math.floor(result.signals[0].length / sampleRate) - windowSize
+  );
   document.getElementById("fileLabel").textContent = `File: ${currentFileName}`;
   populateChannelList(result.channel_names);
   configureSlider();
-  document.getElementById("toggleViewBtn").textContent = "Switch to Compact View";
+  document.getElementById("toggleViewBtn").textContent =
+    "Switch to Compact View";
   plotCurrentWindow();
 
   document.getElementById("toggleViewBtn").onclick = () => {
     isStackedView = !isStackedView;
-    document.getElementById("toggleViewBtn").textContent =
-      isStackedView ? "Switch to Compact View" : "Switch to Stacked View";
+    document.getElementById("toggleViewBtn").textContent = isStackedView
+      ? "Switch to Compact View"
+      : "Switch to Stacked View";
     plotCurrentWindow();
   };
 
@@ -137,9 +144,10 @@ function initializeData(result) {
     }
   });
 
-  document.getElementById("showPsdBtn").addEventListener("click", handlePsdToggle);
+  document
+    .getElementById("showPsdBtn")
+    .addEventListener("click", handlePsdToggle);
 }
-
 
 function populateChannelList(channelNames) {
   const container = document.getElementById("channelList");
@@ -159,7 +167,7 @@ function populateChannelList(channelNames) {
       if (psdVisible) {
         const selected = Array.from(
           document.querySelectorAll("#channelList input:checked")
-        ).map(cb => cb.value);
+        ).map((cb) => cb.value);
         updatePSDPlot(selected);
       }
     });
@@ -169,7 +177,6 @@ function populateChannelList(channelNames) {
     container.appendChild(label);
   });
 }
-
 
 function configureSlider() {
   const slider = document.getElementById("windowSlider");
@@ -203,7 +210,11 @@ function plotCurrentWindow() {
     const data = [];
     const layout = {
       title: { text: `EEG Signal (Stacked)`, x: 0.5 },
-      grid: { rows: selectedChannels.length, columns: 1, pattern: "independent" },
+      grid: {
+        rows: selectedChannels.length,
+        columns: 1,
+        pattern: "independent",
+      },
       height: Math.max(selectedChannels.length * 100, 500),
       margin: { l: 60, r: 20, t: 40, b: 40 },
       showlegend: false,
@@ -212,7 +223,10 @@ function plotCurrentWindow() {
     selectedChannels.forEach((ch, idx) => {
       const chIdx = eegData.channel_names.indexOf(ch);
       const signal = eegData.signals[chIdx].slice(start, end);
-      const time = Array.from({ length: signal.length }, (_, i) => (start + i) / sampleRate);
+      const time = Array.from(
+        { length: signal.length },
+        (_, i) => (start + i) / sampleRate
+      );
 
       data.push({
         x: time,
@@ -223,6 +237,8 @@ function plotCurrentWindow() {
         xaxis: `x${idx + 1}`,
         yaxis: `y${idx + 1}`,
         line: { width: 1 },
+        hoverlabel: { bgcolor: "#eee", font: { size: 11 } },
+        hovertemplate: `<b>${ch}</b><br>Time: %{x:.2f}s<br>Value: %{y:.2f}<extra></extra>`,
       });
 
       layout[`xaxis${idx + 1}`] = {
@@ -230,7 +246,9 @@ function plotCurrentWindow() {
         showticklabels: idx === selectedChannels.length - 1,
       };
       layout[`yaxis${idx + 1}`] = {
-        title: ch,
+        title: ch.length > 12 ? ch.slice(0, 10) + "…" : ch,
+        titlefont: { size: 10 },
+        tickfont: { size: 10 },
         zeroline: false,
       };
     });
@@ -240,7 +258,10 @@ function plotCurrentWindow() {
     const traces = selectedChannels.map((ch) => {
       const chIdx = eegData.channel_names.indexOf(ch);
       const signal = eegData.signals[chIdx].slice(start, end);
-      const time = Array.from({ length: signal.length }, (_, i) => (start + i) / sampleRate);
+      const time = Array.from(
+        { length: signal.length },
+        (_, i) => (start + i) / sampleRate
+      );
       return {
         x: time,
         y: signal,
@@ -267,7 +288,7 @@ function plotCurrentWindow() {
 async function handlePsdToggle() {
   const selectedChannels = Array.from(
     document.querySelectorAll("#channelList input:checked")
-  ).map(cb => cb.value);
+  ).map((cb) => cb.value);
 
   if (!selectedChannels.length) {
     alert("Select at least one channel to view PSD");
@@ -296,10 +317,10 @@ async function updatePSDPlot(selectedChannels) {
   }
 
   try {
-    const selectedIndices = selectedChannels.map(ch =>
+    const selectedIndices = selectedChannels.map((ch) =>
       eegData.channel_names.indexOf(ch)
     );
-    const selectedSignals = selectedIndices.map(i => eegData.signals[i]);
+    const selectedSignals = selectedIndices.map((i) => eegData.signals[i]);
 
     const res = await fetch("http://localhost:5000/psd", {
       method: "POST",
