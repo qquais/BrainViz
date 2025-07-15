@@ -25,15 +25,11 @@ def edf_preview():
         return jsonify({'error': 'No file uploaded'}), 400
 
     try:
-        # ✅ Save EDF to temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".edf") as tmp:
             tmp.write(file.read())
             tmp_path = tmp.name
 
-        # ✅ Read using MNE from file path
         mne_raw_obj = mne.io.read_raw_edf(tmp_path, preload=True, verbose=False)
-
-        # Clean up temp file
         os.remove(tmp_path)
 
         sample_rate = int(mne_raw_obj.info['sfreq'])
@@ -48,7 +44,6 @@ def edf_preview():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-        
 
 @app.route('/edf-channel-data', methods=['POST'])
 def get_channel_data():
@@ -78,7 +73,6 @@ def get_channel_data():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
 @app.route("/filter-signal", methods=["POST"])
 def filter_signal():
     try:
@@ -98,7 +92,7 @@ def filter_signal():
         return jsonify({"filtered": filtered.tolist()})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-      
+
 @app.route('/txt-preview', methods=['POST'])
 def txt_preview():
     if 'file' not in request.files:
@@ -112,40 +106,50 @@ def txt_preview():
         file_path = tmp.name
 
     try:
-        # Try decoding first part of file as ASCII to find header
         with open(file_path, 'rb') as f:
-            header_bytes = f.read(4096)  # Read first 4KB for header
+            header_bytes = f.read(4096)
         try:
             header_text = header_bytes.decode('ascii', errors='ignore')
             lines = header_text.splitlines()
-            eeg_cols = []
             sample_rate = 160  # Default fallback
+
             for line in lines:
                 if 'sampling rate' in line.lower():
                     try:
                         sample_rate = int(''.join(filter(str.isdigit, line)))
                     except:
                         pass
-                if 'channel' in line.lower() and 'label' in line.lower():
-                    eeg_cols.append(line.strip())
 
-            # If channel names aren't found, fallback to CSV
             data_df = pd.read_csv(io.BytesIO(file_bytes), sep=None, engine="python")
-            channel_candidates = [col for col in data_df.columns if any(key in col.lower() for key in ['eeg', 'exg', 'channel'])]
-            if not channel_candidates:
-                raise ValueError("No valid EEG channel columns found.")
-            data = data_df[channel_candidates].replace([np.nan, np.inf, -np.inf], 0.0)
+
+            valid_keywords = ['eeg', 'exg', 'channel', 'fp', 'fz', 'cz', 'oz', 't3', 't4', 'accel']
+            channel_names = [
+                col for col in data_df.columns
+                if any(kw in col.lower() for kw in valid_keywords)
+            ]
+
+            if not channel_names:
+                channel_names = [
+                    col for col in data_df.columns
+                    if pd.api.types.is_numeric_dtype(data_df[col]) and data_df[col].nunique() > 1
+                ]
+
+            if not channel_names:
+                raise ValueError("No valid EEG signal columns found.")
+
+            data = data_df[channel_names].replace([np.nan, np.inf, -np.inf], 0.0)
             sample_limit = min(sample_rate * 10, len(data))
             data = data.iloc[:sample_limit]
             signals = data.to_numpy().T
+
             return jsonify({
                 "sample_rate": sample_rate,
-                "channel_names": channel_candidates,
+                "channel_names": channel_names,
                 "duration": 10,
                 "signals": [ch.tolist() for ch in signals]
             })
+
         except Exception as ascii_err:
-            # If ASCII + pandas fails, try binary interpretation
             with open(file_path, 'rb') as f:
                 f.seek(0, os.SEEK_END)
                 size = f.tell()
@@ -155,7 +159,6 @@ def txt_preview():
                 data = struct.unpack('<' + 'h' * num_ints, raw_data[:num_ints * 2])
                 data = np.array(data, dtype=np.float32)
 
-                # Assume 8 channels (adjust if known)
                 channels = 8
                 data = data[: (len(data) // channels) * channels]
                 data = data.reshape((-1, channels)).T
@@ -168,24 +171,34 @@ def txt_preview():
                     "duration": 10,
                     "signals": [np.nan_to_num(ch[:sample_limit], nan=0.0).tolist() for ch in data]
                 })
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
         os.remove(file_path)
 
-
-
 @app.route("/psd", methods=["POST"])
 def compute_psd():
     try:
         data = request.json
-        signals = np.array(data["signals"])  # shape: (n_channels, n_samples)
+        signals = np.array(data["signals"])
         sfreq = float(data["sample_rate"])
 
-        psd, freqs = psd_array_welch(signals, sfreq=sfreq, fmin=0.5, fmax=50.0, n_fft=2048)
+        n_samples = signals.shape[1]
+        safe_n_fft = min(2048, n_samples)
+
+        psd, freqs = psd_array_welch(
+            signals,
+            sfreq=sfreq,
+            fmin=0.5,
+            fmax=50.0,
+            n_fft=safe_n_fft,
+            n_per_seg=safe_n_fft
+        )
+
         return jsonify({
             "freqs": freqs.tolist(),
-            "psd": psd.tolist()  # shape: (n_channels, n_freqs)
+            "psd": psd.tolist()
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
