@@ -341,22 +341,27 @@ function plotCurrentWindow() {
 }
 
 async function handlePsdToggle() {
-  const selectedChannels = Array.from(
-    document.querySelectorAll("#channelList input:checked")
-  ).map((cb) => cb.value);
+  const selectedChannels = getSelectedChannels();
+
+  const psdDiv = document.getElementById("psdPlot");
 
   if (!selectedChannels.length) {
-    alert("Select at least one channel to view PSD");
+    psdDiv.style.display = "block";
+    psdDiv.innerHTML = `<div style="padding: 10px 20px; color: red;">Please select at least one channel to view PSD.</div>`;
+
+    // Reset state so the button works again when re-clicked
+    document.getElementById("showPsdBtn").textContent = "Show PSD";
+    psdVisible = false;
     return;
   }
 
   if (!psdVisible) {
     await updatePSDPlot(selectedChannels);
-    document.getElementById("psdPlot").style.display = "block";
+    psdDiv.style.display = "block";
     document.getElementById("showPsdBtn").textContent = "Hide PSD";
     psdVisible = true;
   } else {
-    document.getElementById("psdPlot").style.display = "none";
+    psdDiv.style.display = "none";
     document.getElementById("showPsdBtn").textContent = "Show PSD";
     psdVisible = false;
   }
@@ -364,10 +369,10 @@ async function handlePsdToggle() {
 
 async function updatePSDPlot(selectedChannels) {
   const psdDiv = document.getElementById("psdPlot");
-  psdDiv.innerHTML = ""; // Clear any previous plot
+  psdDiv.innerHTML = ""; // Clear previous content
 
   if (!selectedChannels.length) {
-    alert("Please select at least one channel to compute PSD.");
+    psdDiv.innerHTML = `<div style="padding: 20px; color: red;">Please select at least one channel to compute PSD.</div>`;
     return;
   }
 
@@ -408,7 +413,7 @@ async function updatePSDPlot(selectedChannels) {
       showlegend: true,
     });
   } catch (err) {
-    alert("PSD Error: " + err.message);
+    psdDiv.innerHTML = `<div style="padding: 20px; color: red;">PSD Error: ${err.message}</div>`;
   }
 }
 
