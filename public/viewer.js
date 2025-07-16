@@ -113,13 +113,64 @@ function initializeData(result) {
     plotCurrentWindow();
   };
 
-  document.getElementById("applyFilter").addEventListener("click", async () => {
-    const type = document.getElementById("filterType").value;
-    if (type === "none") return;
+document.getElementById("applyFilter").addEventListener("click", async () => {
+  const type = document.getElementById("filterType").value;
+  if (type === "none") return;
 
-    const l_freq = parseFloat(document.getElementById("lowFreq").value || "0");
-    const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
+  const l_freq = parseFloat(document.getElementById("lowFreq").value || "0");
+  const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
 
+  try {
+    const res = await fetch("http://localhost:5000/filter-signal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        signals: eegData.signals,
+        sample_rate: sampleRate,
+        filter_type: type,
+        l_freq: isNaN(l_freq) ? null : l_freq,
+        h_freq: isNaN(h_freq) ? null : h_freq,
+      }),
+    });
+
+    const result = await res.json();
+    if (result.error) throw new Error(result.error);
+
+    eegData.signals = result.filtered;
+    plotCurrentWindow();
+    // Removed: alert("Filter applied!");
+  } catch (err) {
+    alert("Error applying filter: " + err.message);
+  }
+});
+
+
+document.getElementById("rejectorSelect").addEventListener("change", async (e) => {
+  const value = e.target.value;
+
+  if (value === "off") {
+    // Reload original signals from storage
+    const eegStore = new EEGStorage();
+    const edfData = await eegStore.getEDFFile();
+    if (edfData?.data) {
+      await sendToFlaskAndLoadSignals(edfData.data);
+    } else {
+      const db = await eegStore.openDB();
+      const tx = db.transaction(["eegFiles"], "readonly");
+      const store = tx.objectStore("eegFiles");
+      const request = store.get("current_text");
+
+      const textResult = await new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+
+      db.close();
+      if (textResult?.data) {
+        await sendTextToFlaskAndLoadSignals(textResult.data);
+      }
+    }
+  } else if (value === "50" || value === "60") {
     try {
       const res = await fetch("http://localhost:5000/filter-signal", {
         method: "POST",
@@ -127,9 +178,8 @@ function initializeData(result) {
         body: JSON.stringify({
           signals: eegData.signals,
           sample_rate: sampleRate,
-          filter_type: type,
-          l_freq: isNaN(l_freq) ? null : l_freq,
-          h_freq: isNaN(h_freq) ? null : h_freq,
+          filter_type: "notch",
+          l_freq: parseFloat(value),
         }),
       });
 
@@ -138,11 +188,15 @@ function initializeData(result) {
 
       eegData.signals = result.filtered;
       plotCurrentWindow();
-      alert("Filter applied!");
     } catch (err) {
-      alert("Error applying filter: " + err.message);
+      console.error("Rejector error:", err.message);
     }
-  });
+  }
+
+  // Reset dropdown back to label
+  e.target.selectedIndex = 0;
+});
+
 
   document
     .getElementById("showPsdBtn")
@@ -363,20 +417,26 @@ function setupChannelToggleButtons() {
   const unselectAllBtn = document.getElementById("unselectAllBtn");
 
   selectAllBtn.addEventListener("click", () => {
-    document.querySelectorAll("#channelList input[type='checkbox']").forEach(cb => cb.checked = true);
+    document
+      .querySelectorAll("#channelList input[type='checkbox']")
+      .forEach((cb) => (cb.checked = true));
     plotCurrentWindow();
     if (psdVisible) updatePSDPlot(getSelectedChannels());
   });
 
   unselectAllBtn.addEventListener("click", () => {
-    document.querySelectorAll("#channelList input[type='checkbox']").forEach(cb => cb.checked = false);
+    document
+      .querySelectorAll("#channelList input[type='checkbox']")
+      .forEach((cb) => (cb.checked = false));
     plotCurrentWindow();
     if (psdVisible) updatePSDPlot(getSelectedChannels());
   });
 }
 
 function getSelectedChannels() {
-  return Array.from(document.querySelectorAll("#channelList input:checked")).map(cb => cb.value);
+  return Array.from(
+    document.querySelectorAll("#channelList input:checked")
+  ).map((cb) => cb.value);
 }
 
 function showError(message) {
