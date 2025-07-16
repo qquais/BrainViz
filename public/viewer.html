@@ -1,286 +1,197 @@
 <!DOCTYPE html>
-<!--
-  EEG Data Visualization Viewer - Enhanced Version
-  
-  This HTML file creates the full-screen EEG data visualization interface.
-  Enhanced with IndexedDB storage support.
-  
-  Features:
-  - Full viewport plotting area using Plotly.js
-  - Interactive charts with zoom, pan, and hover capabilities
-  - Responsive design that adapts to any screen size
-  - Enhanced error handling with troubleshooting info
-  - Support for both Chrome storage and IndexedDB
-  
-  Data Flow:
-  1. Extension stores EEG data in Chrome storage OR IndexedDB (for large files)
-  2. This page loads and retrieves data from appropriate storage
-  3. viewer.js processes and visualizes the data using available decoders
-  4. Plotly.js renders interactive charts
-  
-  Dependencies:
-  - plotly.min.js (interactive charting library)
-  - eegStorage.js (storage helper for IndexedDB)
-  - viewer.js (data processing and visualization logic)
-  - Chrome Extension APIs (storage, runtime)
-  
-  Version: 1.5 Enhanced Storage
-  Author: EEG Reader Extension Team
--->
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>EEG Plot Viewer</title>
 
-    <!-- 
-    Plotly.js - Interactive charting library
-    Used for creating interactive, zoomable EEG signal plots
-    Features: zoom, pan, hover tooltips, responsive design
-  -->
-    <script src="libs/plotly.min.js"></script>
-
-    <!--
-    EEG Storage Helper - IndexedDB management
-    Handles large file storage that exceeds Chrome storage limits
-    Provides unified interface for both Chrome storage and IndexedDB
-  -->
-    <script src="eegStorage.js"></script>
-
-    <!--
-    Enhanced CSS for full-screen plotting experience
-    Removes all margins and padding to maximize plot area
-    Adds loading states and error styling
-  -->
-    <style>
-      /* 
-      Remove all default browser styling for clean full-screen experience
-      Sets up the page for a complete plotting interface
-    */
-      body {
-        margin: 0; /* Remove default browser margins */
-        padding: 0; /* Remove default browser padding */
-        font-family: Arial, sans-serif; /* Consistent font for any text elements */
-        background: #f5f5f5; /* Light background for loading states */
-      }
-
-      /*
-      Plot container takes up entire viewport
-      This ensures the EEG visualization uses maximum screen real estate
-    */
-      #plot {
-        width: 100vw; /* Full viewport width */
-        height: 100vh; /* Full viewport height */
-        background: white; /* White background for plot area */
-      }
-
-      /*
-      Loading message styling
-      Centers loading text and provides visual feedback
-    */
-      .loading {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-        font-size: 18px;
-        color: #666;
-      }
-
-      /*
-      Error message container styling
-      Provides clear error presentation with troubleshooting info
-    */
-      .error-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-        flex-direction: column;
-        padding: 20px;
-        text-align: center;
-      }
-
-      .error-message {
-        font-size: 18px;
-        color: #d32f2f;
-        margin-bottom: 20px;
-        line-height: 1.4;
-        max-width: 600px;
-      }
-
-      .troubleshooting {
-        margin-bottom: 20px;
-        padding: 15px;
-        background: #f0f0f0;
-        border-radius: 8px;
-        font-size: 14px;
-        max-width: 600px;
-        text-align: left;
-      }
-
-      .technical-info {
-        margin-bottom: 20px;
-        padding: 15px;
-        background: #e3f2fd;
-        border-radius: 8px;
-        font-size: 12px;
-        max-width: 600px;
-        text-align: left;
-      }
-
-      .action-buttons {
-        display: flex;
-        gap: 10px;
-      }
-
-      .btn {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 14px;
-        transition: background-color 0.3s;
-      }
-
-      .btn-primary {
-        background: #2196f3;
-        color: white;
-      }
-
-      .btn-primary:hover {
-        background: #1976d2;
-      }
-
-      .btn-success {
-        background: #4caf50;
-        color: white;
-      }
-
-      .btn-success:hover {
-        background: #45a049;
-      }
-
-      /*
-      Responsive design for smaller screens
-      Ensures error messages remain readable on mobile devices
-    */
-      @media (max-width: 768px) {
-        .error-container {
-          padding: 10px;
-        }
-
-        .error-message,
-        .troubleshooting,
-        .technical-info {
-          max-width: 90vw;
-          font-size: smaller;
-        }
-
-        .action-buttons {
-          flex-direction: column;
-          width: 100%;
-          max-width: 200px;
-        }
-      }
-    </style>
-  </head>
-  <!--
-    Main plot container
-    This div will be replaced by either:
-    - An interactive Plotly chart (success case)
-    - A detailed error message with troubleshooting info (error case)
-    - A loading message (initial state)
-    
-    The viewer.js script will determine which content to show based on:
-    - Whether required libraries are loaded
-    - Whether EEG data is available in storage
-    - Whether the data can be successfully processed
-  -->
-  <body
-    style="
+<head>
+  <meta charset="UTF-8" />
+  <title>EEG Clinical Viewer</title>
+  <script src="libs/plotly.min.js"></script>
+  <script src="eegStorage.js"></script>
+  <style>
+    body {
       margin: 0;
       padding: 0;
       height: 100vh;
-      overflow: hidden;
+      display: flex;
       font-family: Arial, sans-serif;
-    "
-  >
-    <!-- Control Bar -->
-    <div
-      style="
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        background: #f0f0f0;
-        padding: 10px 15px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        z-index: 10;
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        flex-wrap: wrap;
-      "
-    >
-      <label for="channelSelect" style="font-weight: bold">Channels:</label>
-      <select
-        id="channelSelect"
-        multiple
-        size="3"
-        style="padding: 5px; width: 200px"
-      ></select>
+      overflow: hidden;
+    }
 
-      <label for="windowSlider" style="font-weight: bold">Time Window:</label>
-      <input
-        type="range"
-        id="windowSlider"
-        min="0"
-        max="100"
-        step="1"
-        value="0"
-        style="width: 200px"
-      />
+    #sidebar {
+      width: 240px;
+      background: #f0f4f8;
+      border-right: 1px solid #ccc;
+      padding: 15px;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+
+    #sidebar h2 {
+      font-size: 18px;
+      margin-bottom: 10px;
+      color: #2c3e50;
+    }
+
+    #channelButtons {
+      margin-bottom: 10px;
+    }
+
+    #channelButtons button {
+      background: #2196f3;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      margin-right: 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    #channelButtons button:hover {
+      background: #1976d2;
+    }
+
+    #channelList label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: #34495e;
+      cursor: pointer;
+    }
+
+    #channelList input[type="checkbox"] {
+      margin-right: 8px;
+      transform: scale(1.1);
+    }
+
+    #main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      height: 100vh;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+
+    #fileTitle {
+      padding: 10px 15px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+      background: #e8f0fe;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #toggleViewBtn {
+      background: #2196f3;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    #plot {
+      flex: 1;
+      background: white;
+    }
+
+    #bottomControls {
+      position: sticky;
+      bottom: 0;
+      z-index: 999;
+      background: #f8f8f8;
+      padding: 10px 15px;
+      border-top: 1px solid #ccc;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    #bottomControls select,
+    #bottomControls input[type="number"],
+    #bottomControls button {
+      padding: 6px;
+      font-size: 14px;
+    }
+
+    #windowSlider {
+      flex: 1;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      font-size: 18px;
+      color: #666;
+    }
+
+    #psdPlot {
+      display: none;
+      padding: 20px;
+      background: #fcfcfc;
+      border-top: 1px solid #ccc;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <h2>Channels</h2>
+    <div id="channelButtons">
+      <button id="selectAllBtn">Select All</button>
+      <button id="unselectAllBtn">Unselect All</button>
+    </div>
+    <div id="channelList"></div>
+  </div>
+
+  <!-- Main content -->
+  <div id="main">
+    <div id="fileTitle">
+      <span id="fileLabel">File: Loading...</span>
+      <button id="toggleViewBtn">Switch to Stacked View</button>
+    </div>
+
+    <div id="plot">
+      <div class="loading">🧠 Loading EEG data...</div>
+    </div>
+
+    <div id="psdPlot"></div>
+
+    <!-- Bottom control bar -->
+    <div id="bottomControls">
+      <select id="rejectorSelect">
+        <option disabled selected>Rejector</option>
+        <option value="off">Off</option>
+        <option value="50">50 Hz</option>
+        <option value="60">60 Hz</option>
+      </select>
+      <select id="filterType">
+        <option value="none">None</option>
+        <option value="bandpass">Bandpass</option>
+        <option value="highpass">High-pass</option>
+        <option value="lowpass">Low-pass</option>
+      </select>
+      <input type="number" id="lowFreq" placeholder="Low Freq (Hz)" />
+      <input type="number" id="highFreq" placeholder="High Freq (Hz)" />
+      <button id="applyFilter">Apply</button>
+
+      <label for="windowSlider"><strong>Time Window:</strong></label>
+      <input type="range" id="windowSlider" min="0" max="100" step="1" value="0" />
       <span id="windowTimeLabel">0–10s</span>
-    </div>
 
-    <div
-      id="fileTitle"
-      style="
-        padding: 10px 15px;
-        font-size: 16px;
-        font-weight: bold;
-        color: #333;
-        background: #fafafa;
-        border-bottom: 1px solid #ddd;
-      "
-    >
-      <!-- filename will be injected here -->
+      <button id="showPsdBtn">Show PSD</button>
     </div>
+  </div>
 
-    <!-- Fullscreen Plot below the bar -->
-    <div
-      id="plot"
-      style="
-        position: absolute;
-        top: 100px;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: white;
-      "
-    >
-      <!-- Plotly chart renders here -->
-    </div>
+  <script src="viewer.js"></script>
+</body>
 
-    <!--
-    Main visualization script
-    Enhanced version that handles:
-    - Multiple storage sources (Chrome storage + IndexedDB)
-    - Multiple EDF decoder libraries (main + fallback)
-    - Improved error handling and user feedback
-    - Support for both text and binary EEG formats
-    - Responsive design and performance optimization
-  -->
-    <script src="viewer.js"></script>
-  </body>
 </html>

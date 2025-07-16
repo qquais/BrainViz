@@ -3,46 +3,24 @@ let sampleRate = 256;
 let windowSize = 10;
 let maxWindow = 0;
 let currentFileName = "Unknown File";
-
-console.log("🔧 EEG Viewer starting...");
+let isStackedView = true;
+let psdVisible = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
-  console.log("🚀 DOM loaded, initializing viewer...");
-
-  window.addEventListener("error", (e) => {
-    console.error("💥 Global error caught:", e.error);
-    showError(`JavaScript Error: ${e.error.message}`);
-    e.preventDefault();
-    return true;
-  });
-
-  window.addEventListener("unhandledrejection", (e) => {
-    console.error("💥 Unhandled promise rejection:", e.reason);
-    showError(`Promise Error: ${e.reason}`);
-    e.preventDefault();
-    return true;
-  });
-
   try {
     await initializeViewer();
   } catch (error) {
-    console.error("💥 Initialization failed:", error);
     showError(`Initialization failed: ${error.message}`);
   }
 });
 
 async function initializeViewer() {
-  console.log("🔧 Initializing viewer...");
-
-  if (typeof Plotly === "undefined") {
-    throw new Error("Plotly.js library not loaded");
-  }
+  if (typeof Plotly === "undefined") throw new Error("Plotly.js not loaded");
 
   const eegStore = new EEGStorage();
   const edfData = await eegStore.getEDFFile();
 
-  if (edfData && edfData.data) {
-    console.log("📦 Found EDF file in IndexedDB:", edfData.filename);
+  if (edfData?.data) {
     currentFileName = edfData.filename || "Unknown File";
     await sendToFlaskAndLoadSignals(edfData.data);
     return;
@@ -52,25 +30,21 @@ async function initializeViewer() {
     const db = await eegStore.openDB();
     const tx = db.transaction(["eegFiles"], "readonly");
     const store = tx.objectStore("eegFiles");
+    const request = store.get("current_text");
 
     const textResult = await new Promise((resolve, reject) => {
-      const request = store.get("current_text");
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
 
     db.close();
-
-    if (textResult && textResult.data) {
-      console.log("📄 Found TXT EEG file in IndexedDB:", textResult.filename);
+    if (textResult?.data) {
       currentFileName = textResult.filename || "Unknown File";
       await sendTextToFlaskAndLoadSignals(textResult.data);
-      return;
+    } else {
+      showError("No EEG data found in IndexedDB");
     }
-
-    showError("No EEG data found in IndexedDB");
   } catch (e) {
-    console.error("❌ Error checking text EEG fallback:", e);
     showError("No EEG data found in IndexedDB");
   }
 }
@@ -80,7 +54,6 @@ async function sendToFlaskAndLoadSignals(bufferArray) {
     const blob = new Blob([new Uint8Array(bufferArray)], {
       type: "application/octet-stream",
     });
-
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
@@ -92,10 +65,8 @@ async function sendToFlaskAndLoadSignals(bufferArray) {
     if (!response.ok) throw new Error(await response.text());
 
     const result = await response.json();
-    console.log("✅ EDF Preview from Flask:", result);
     initializeData(result);
   } catch (error) {
-    console.error("❌ Error loading EDF data:", error);
     showError(error.message);
   }
 }
@@ -103,7 +74,6 @@ async function sendToFlaskAndLoadSignals(bufferArray) {
 async function sendTextToFlaskAndLoadSignals(text) {
   try {
     const blob = new Blob([text], { type: "text/plain" });
-
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
@@ -115,10 +85,8 @@ async function sendTextToFlaskAndLoadSignals(text) {
     if (!response.ok) throw new Error(await response.text());
 
     const result = await response.json();
-    console.log("✅ TXT EEG Preview from Flask:", result);
     initializeData(result);
   } catch (error) {
-    console.error("❌ Error loading TXT data:", error);
     showError(error.message);
   }
 }
@@ -126,30 +94,143 @@ async function sendTextToFlaskAndLoadSignals(text) {
 function initializeData(result) {
   eegData = result;
   sampleRate = result.sample_rate;
-  maxWindow = Math.max(0, Math.floor(result.signals[0].length / sampleRate) - windowSize);
-
-  document.getElementById("fileTitle").textContent = `File: ${currentFileName}`;
-  populateChannelDropdown(result.channel_names);
+  maxWindow = Math.max(
+    0,
+    Math.floor(result.signals[0].length / sampleRate) - windowSize
+  );
+  document.getElementById("fileLabel").textContent = `File: ${currentFileName}`;
+  populateChannelList(result.channel_names);
   configureSlider();
+  document.getElementById("toggleViewBtn").textContent =
+    "Switch to Compact View";
   plotCurrentWindow();
+
+  document.getElementById("toggleViewBtn").onclick = () => {
+    isStackedView = !isStackedView;
+    document.getElementById("toggleViewBtn").textContent = isStackedView
+      ? "Switch to Compact View"
+      : "Switch to Stacked View";
+    plotCurrentWindow();
+  };
+
+document.getElementById("applyFilter").addEventListener("click", async () => {
+  const type = document.getElementById("filterType").value;
+  if (type === "none") return;
+
+  const l_freq = parseFloat(document.getElementById("lowFreq").value || "0");
+  const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
+
+  try {
+    const res = await fetch("http://localhost:5000/filter-signal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        signals: eegData.signals,
+        sample_rate: sampleRate,
+        filter_type: type,
+        l_freq: isNaN(l_freq) ? null : l_freq,
+        h_freq: isNaN(h_freq) ? null : h_freq,
+      }),
+    });
+
+    const result = await res.json();
+    if (result.error) throw new Error(result.error);
+
+    eegData.signals = result.filtered;
+    plotCurrentWindow();
+    // Removed: alert("Filter applied!");
+  } catch (err) {
+    alert("Error applying filter: " + err.message);
+  }
+});
+
+
+document.getElementById("rejectorSelect").addEventListener("change", async (e) => {
+  const value = e.target.value;
+
+  if (value === "off") {
+    // Reload original signals from storage
+    const eegStore = new EEGStorage();
+    const edfData = await eegStore.getEDFFile();
+    if (edfData?.data) {
+      await sendToFlaskAndLoadSignals(edfData.data);
+    } else {
+      const db = await eegStore.openDB();
+      const tx = db.transaction(["eegFiles"], "readonly");
+      const store = tx.objectStore("eegFiles");
+      const request = store.get("current_text");
+
+      const textResult = await new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+
+      db.close();
+      if (textResult?.data) {
+        await sendTextToFlaskAndLoadSignals(textResult.data);
+      }
+    }
+  } else if (value === "50" || value === "60") {
+    try {
+      const res = await fetch("http://localhost:5000/filter-signal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signals: eegData.signals,
+          sample_rate: sampleRate,
+          filter_type: "notch",
+          l_freq: parseFloat(value),
+        }),
+      });
+
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+
+      eegData.signals = result.filtered;
+      plotCurrentWindow();
+    } catch (err) {
+      console.error("Rejector error:", err.message);
+    }
+  }
+
+  // Reset dropdown back to label
+  e.target.selectedIndex = 0;
+});
+
+
+  document
+    .getElementById("showPsdBtn")
+    .addEventListener("click", handlePsdToggle);
 }
 
-function populateChannelDropdown(channelNames) {
-  const select = document.getElementById("channelSelect");
-  select.innerHTML = "";
+function populateChannelList(channelNames) {
+  setupChannelToggleButtons();
+  const container = document.getElementById("channelList");
+  if (!container) return;
+  container.innerHTML = "";
 
-  for (const ch of channelNames) {
-    const opt = document.createElement("option");
-    opt.value = ch;
-    opt.textContent = ch;
-    select.appendChild(opt);
-  }
+  channelNames.forEach((ch) => {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = ch;
+    input.checked = true;
 
-  for (let i = 0; i < Math.min(3, select.options.length); i++) {
-    select.options[i].selected = true;
-  }
+    input.addEventListener("change", () => {
+      plotCurrentWindow();
 
-  select.addEventListener("change", plotCurrentWindow);
+      if (psdVisible) {
+        const selected = Array.from(
+          document.querySelectorAll("#channelList input:checked")
+        ).map((cb) => cb.value);
+        updatePSDPlot(selected);
+      }
+    });
+
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(ch));
+    container.appendChild(label);
+  });
 }
 
 function configureSlider() {
@@ -158,11 +239,7 @@ function configureSlider() {
 
   slider.max = maxWindow;
   slider.value = 0;
-  slider.disabled = false; // Always keep enabled for UI clarity
-  slider.title = maxWindow <= 0
-    ? "This EEG signal is too short to scroll — full signal is shown."
-    : "Drag to view different time windows";
-
+  slider.disabled = false;
   label.textContent = `0s–${windowSize}s`;
 
   slider.addEventListener("input", () => {
@@ -170,104 +247,204 @@ function configureSlider() {
     label.textContent = `${startSec}s–${startSec + windowSize}s`;
     plotCurrentWindow();
   });
-
-  // Add dynamic UX notice if signal is too short
-  const existingNote = document.getElementById("shortSignalNote");
-  if (maxWindow <= 0 && !existingNote) {
-    const note = document.createElement("div");
-    note.id = "shortSignalNote";
-    note.textContent = "ℹ️ Full signal shown — scrolling is disabled for short recordings.";
-    note.style.fontSize = "12px";
-    note.style.color = "#666";
-    note.style.marginTop = "4px";
-    slider.parentElement.appendChild(note);
-  }
 }
 
 function plotCurrentWindow() {
-  const select = document.getElementById("channelSelect");
-  const slider = document.getElementById("windowSlider");
+  const plotDiv = document.getElementById("plot");
+  plotDiv.innerHTML = "";
 
-  const selectedChannels = Array.from(select.selectedOptions).map(
-    (opt) => opt.value
-  );
+  const slider = document.getElementById("windowSlider");
+  const selectedChannels = Array.from(
+    document.querySelectorAll("#channelList input:checked")
+  ).map((cb) => cb.value);
+
   const start = parseInt(slider.value) * sampleRate;
   const end = start + windowSize * sampleRate;
 
-  const traces = [];
+  if (isStackedView) {
+    const data = [];
+    const layout = {
+      title: { text: `EEG Signal (Stacked)`, x: 0.5 },
+      grid: {
+        rows: selectedChannels.length,
+        columns: 1,
+        pattern: "independent",
+      },
+      height: Math.max(selectedChannels.length * 100, 500),
+      margin: { l: 60, r: 20, t: 40, b: 40 },
+      showlegend: false,
+    };
 
-  selectedChannels.forEach((ch) => {
-    const chIdx = eegData.channel_names.indexOf(ch);
-    if (chIdx === -1) return;
+    selectedChannels.forEach((ch, idx) => {
+      const chIdx = eegData.channel_names.indexOf(ch);
+      const signal = eegData.signals[chIdx].slice(start, end);
+      const time = Array.from(
+        { length: signal.length },
+        (_, i) => (start + i) / sampleRate
+      );
 
-    const signal = eegData.signals[chIdx].slice(start, end);
-    const time = Array.from(
-      { length: signal.length },
-      (_, i) => (start + i) / sampleRate
+      data.push({
+        x: time,
+        y: signal,
+        type: "scatter",
+        mode: "lines",
+        name: ch,
+        xaxis: `x${idx + 1}`,
+        yaxis: `y${idx + 1}`,
+        line: { width: 1 },
+        hoverlabel: { bgcolor: "#eee", font: { size: 11 } },
+        hovertemplate: `<b>${ch}</b><br>Time: %{x:.2f}s<br>Value: %{y:.2f}<extra></extra>`,
+      });
+
+      layout[`xaxis${idx + 1}`] = {
+        title: idx === selectedChannels.length - 1 ? "Time (s)" : "",
+        showticklabels: idx === selectedChannels.length - 1,
+      };
+      layout[`yaxis${idx + 1}`] = {
+        title: ch.length > 12 ? ch.slice(0, 10) + "…" : ch,
+        titlefont: { size: 10 },
+        tickfont: { size: 10 },
+        zeroline: false,
+      };
+    });
+
+    Plotly.newPlot("plot", data, layout, { responsive: true });
+  } else {
+    const traces = selectedChannels.map((ch) => {
+      const chIdx = eegData.channel_names.indexOf(ch);
+      const signal = eegData.signals[chIdx].slice(start, end);
+      const time = Array.from(
+        { length: signal.length },
+        (_, i) => (start + i) / sampleRate
+      );
+      return {
+        x: time,
+        y: signal,
+        type: "scatter",
+        mode: "lines",
+        name: ch,
+        line: { width: 1.2 },
+      };
+    });
+
+    const layout = {
+      title: { text: `EEG Signal (Compact)`, x: 0.5 },
+      xaxis: { title: "Time (s)" },
+      yaxis: { title: "Amplitude (µV)" },
+      height: window.innerHeight - 140,
+      margin: { l: 60, r: 40, t: 40, b: 60 },
+      showlegend: true,
+    };
+
+    Plotly.newPlot("plot", traces, layout, { responsive: true });
+  }
+}
+
+async function handlePsdToggle() {
+  const selectedChannels = getSelectedChannels();
+
+  const psdDiv = document.getElementById("psdPlot");
+
+  if (!selectedChannels.length) {
+    psdDiv.style.display = "block";
+    psdDiv.innerHTML = `<div style="padding: 10px 20px; color: red;">Please select at least one channel to view PSD.</div>`;
+
+    // Reset state so the button works again when re-clicked
+    document.getElementById("showPsdBtn").textContent = "Show PSD";
+    psdVisible = false;
+    return;
+  }
+
+  if (!psdVisible) {
+    await updatePSDPlot(selectedChannels);
+    psdDiv.style.display = "block";
+    document.getElementById("showPsdBtn").textContent = "Hide PSD";
+    psdVisible = true;
+  } else {
+    psdDiv.style.display = "none";
+    document.getElementById("showPsdBtn").textContent = "Show PSD";
+    psdVisible = false;
+  }
+}
+
+async function updatePSDPlot(selectedChannels) {
+  const psdDiv = document.getElementById("psdPlot");
+  psdDiv.innerHTML = ""; // Clear previous content
+
+  if (!selectedChannels.length) {
+    psdDiv.innerHTML = `<div style="padding: 20px; color: red;">Please select at least one channel to compute PSD.</div>`;
+    return;
+  }
+
+  try {
+    const selectedIndices = selectedChannels.map((ch) =>
+      eegData.channel_names.indexOf(ch)
     );
+    const selectedSignals = selectedIndices.map((i) => eegData.signals[i]);
 
-    traces.push({
-      x: time,
-      y: signal,
+    const res = await fetch("http://localhost:5000/psd", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        signals: selectedSignals,
+        sample_rate: sampleRate,
+      }),
+    });
+
+    if (!res.ok) throw new Error(await res.text());
+
+    const psdData = await res.json();
+    if (psdData.error) throw new Error(psdData.error);
+
+    const traces = psdData.psd.map((spectrum, i) => ({
+      x: psdData.freqs,
+      y: spectrum,
       type: "scatter",
       mode: "lines",
-      name: ch,
+      name: selectedChannels[i],
+    }));
+
+    Plotly.newPlot("psdPlot", traces, {
+      title: { text: "Power Spectral Density (PSD)", x: 0.5 },
+      xaxis: { title: "Frequency (Hz)" },
+      yaxis: { title: "Power (dB/Hz)" },
+      height: 400,
+      margin: { l: 60, r: 40, t: 40, b: 60 },
+      showlegend: true,
     });
+  } catch (err) {
+    psdDiv.innerHTML = `<div style="padding: 20px; color: red;">PSD Error: ${err.message}</div>`;
+  }
+}
+
+function setupChannelToggleButtons() {
+  const selectAllBtn = document.getElementById("selectAllBtn");
+  const unselectAllBtn = document.getElementById("unselectAllBtn");
+
+  selectAllBtn.addEventListener("click", () => {
+    document
+      .querySelectorAll("#channelList input[type='checkbox']")
+      .forEach((cb) => (cb.checked = true));
+    plotCurrentWindow();
+    if (psdVisible) updatePSDPlot(getSelectedChannels());
   });
 
-  const layout = {
-    title: {
-      text: `File: ${currentFileName}`,
-      x: 0.5,
-      font: { size: 18 },
-    },
-    xaxis: {
-      title: "Time (s)",
-      titlefont: { size: 14 },
-      tickfont: { size: 12 },
-      automargin: true,
-    },
-    yaxis: {
-      title: "Amplitude (µV)",
-      titlefont: { size: 14 },
-      tickfont: { size: 12 },
-      automargin: true,
-    },
-    margin: { l: 60, r: 40, t: 80, b: 80 }, // increased bottom margin
-    height: window.innerHeight - 80,
-    showlegend: true,
-  };
-
-  Plotly.newPlot("plot", traces, layout, {
-    responsive: true,
-    displayModeBar: true,
-    modeBarButtonsToRemove: ["lasso2d", "select2d"],
+  unselectAllBtn.addEventListener("click", () => {
+    document
+      .querySelectorAll("#channelList input[type='checkbox']")
+      .forEach((cb) => (cb.checked = false));
+    plotCurrentWindow();
+    if (psdVisible) updatePSDPlot(getSelectedChannels());
   });
+}
+
+function getSelectedChannels() {
+  return Array.from(
+    document.querySelectorAll("#channelList input:checked")
+  ).map((cb) => cb.value);
 }
 
 function showError(message) {
   const plotDiv = document.getElementById("plot");
-  plotDiv.innerHTML = `
-    <div style="display: flex; align-items: center; justify-content: center; height: 100vh; flex-direction: column; padding: 20px; text-align: center;">
-      <div style="font-size: 18px; color: #d32f2f; margin-bottom: 20px; max-width: 600px; line-height: 1.4;">
-        ${message}
-      </div>
-      <div style="padding: 15px; background: #f0f0f0; border-radius: 8px; font-size: 14px; max-width: 600px;">
-        - Check browser console (F12) for detailed logs<br>
-        - Ensure Flask API is running at http://localhost:5000<br>
-        - Make sure CORS is enabled in Flask
-      </div>
-      <div style="margin-top: 20px;">
-        <button onclick="window.location.reload()" style="padding: 8px 16px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">Reload Page</button>
-      </div>
-    </div>
-  `;
+  plotDiv.innerHTML = `<div class="error-container"><h3>Error</h3><p>${message}</p></div>`;
 }
-
-document.getElementById("plot").innerHTML = `
-  <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 18px; color: #666;">
-    🧠 Loading EEG data...
-  </div>
-`;
-
-console.log("✅ Viewer script loaded successfully");
