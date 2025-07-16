@@ -82,7 +82,7 @@ function initializeEEGInterceptor() {
             console.log("📨 Background response:", res);
             if (res?.success === false) {
               console.warn(
-                "⛔ Not EEG — allow default browser download:",
+                "Not EEG — allow default browser download:",
                 href
               );
               window.location.href = href;
