@@ -1,4 +1,4 @@
-console.log("🔧 EEG Content script starting on:", window.location.href);
+console.log("EEG Content script starting on:", window.location.href);
 
 function isExtensionContextValid() {
   try {
@@ -85,7 +85,7 @@ function initializeEEGInterceptor() {
                 "⛔ Not EEG — allow default browser download:",
                 href
               );
-              window.location.href = href; // ✅ fallback to download
+              window.location.href = href;
             }
           }
         );
@@ -110,7 +110,7 @@ function initializeEEGInterceptor() {
           },
           (res) => {
             if (res?.success === false) {
-              alert("⚠️ EEG Viewer failed to open.");
+              alert("EEG Viewer failed to open.");
             }
           }
         );

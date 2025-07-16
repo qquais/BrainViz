@@ -6,11 +6,11 @@
  * @version: 1.5 - Updated July 16, 2025
  */
 
-console.log("🔧 Script injector loaded on:", window.location.hostname);
+console.log("Script injector loaded on:", window.location.hostname);
 
 // Prevent multiple initialization
 if (window.eegInterceptorInitialized) {
-  console.log("⚠️ EEG interceptor already initialized, skipping");
+  console.log("EEG interceptor already initialized, skipping");
 } else {
   window.eegInterceptorInitialized = true;
 
@@ -40,7 +40,7 @@ if (window.eegInterceptorInitialized) {
 
     const extensionMatchOnly = hasEEGExtension && hasDownloadParam;
 
-    console.log("🔍 URL extension-based guess (not real EEG check):", {
+    console.log("URL extension-based guess (not real EEG check):", {
       url,
       extensionMatched: extensionMatchOnly,
       hasEEGExtension,
@@ -61,14 +61,14 @@ if (window.eegInterceptorInitialized) {
     const href = link.href || link.getAttribute('href');
     const matched = isEEGFile(href);
 
-    console.log("📎 Link clicked:", href, "→ extension match:", matched);
+    console.log("Link clicked:", href, "→ extension match:", matched);
 
     if (matched) {
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
 
-      console.log("🧠 EEG candidate link intercepted:", href);
+      console.log("EEG candidate link intercepted:", href);
       window.postMessage({ type: "EEG_INTERCEPT", href }, "*");
       return false;
     }
@@ -79,5 +79,5 @@ if (window.eegInterceptorInitialized) {
     passive: false
   });
 
-  console.log("✅ EEG interceptor initialized with safe extension-based detection");
+  console.log("EEG interceptor initialized with safe extension-based detection");
 }

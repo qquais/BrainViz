@@ -1,5 +1,5 @@
-importScripts('eegStorage.js');
-console.log("🚀 Background script loaded");
+importScripts("eegStorage.js");
+console.log("Background script loaded");
 
 function isEEGDownload(url) {
   if (!url) return false;
@@ -43,21 +43,39 @@ function isValidEEGBuffer(buffer) {
     if (isNaN(ns) || ns <= 0) return false;
 
     const signalLabelsRaw = buffer.slice(256, 256 + ns * 16);
-    const signalLabels = new TextDecoder().decode(signalLabelsRaw).toLowerCase();
+    const signalLabels = new TextDecoder()
+      .decode(signalLabelsRaw)
+      .toLowerCase();
 
     const eegKeywords = [
-      "eeg", "fp1", "fp2", "fz", "cz", "pz", "oz",
-      "f3", "f4", "c3", "c4", "p3", "p4",
-      "o1", "o2", "t3", "t4", "t5", "t6"
+      "eeg",
+      "fp1",
+      "fp2",
+      "fz",
+      "cz",
+      "pz",
+      "oz",
+      "f3",
+      "f4",
+      "c3",
+      "c4",
+      "p3",
+      "p4",
+      "o1",
+      "o2",
+      "t3",
+      "t4",
+      "t5",
+      "t6",
     ];
     const nonEEGKeywords = ["emg", "ecg", "eog", "abdomen", "direct"];
 
-    const hasEEG = eegKeywords.some(k => signalLabels.includes(k));
-    const isLikelyNotEEG = nonEEGKeywords.some(k => signalLabels.includes(k));
+    const hasEEG = eegKeywords.some((k) => signalLabels.includes(k));
+    const isLikelyNotEEG = nonEEGKeywords.some((k) => signalLabels.includes(k));
 
     return hasEEG && !isLikelyNotEEG;
   } catch (e) {
-    console.error("❌ Error in EDF EEG detection:", e);
+    console.error("Error in EDF EEG detection:", e);
     return false;
   }
 }
@@ -85,33 +103,40 @@ async function handleDownload(url) {
     if (isEDF) {
       const arrayBuffer = await response.arrayBuffer();
       if (!isValidEEGBuffer(arrayBuffer)) {
-        console.warn("⛔ Not valid EEG (probably ECG)");
+        console.warn("Not valid EEG (probably ECG)");
         return;
       }
       await chrome.storage.local.clear();
-      chrome.storage.local.set({
-        eegDataBuffer: Array.from(new Uint8Array(arrayBuffer)),
-        eegDataType: "edf"
-      }, () => {
-        chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
-      });
+      chrome.storage.local.set(
+        {
+          eegDataBuffer: Array.from(new Uint8Array(arrayBuffer)),
+          eegDataType: "edf",
+        },
+        () => {
+          chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
+        }
+      );
     } else {
       const text = await response.text();
       if (
         text.toLowerCase().includes("<html") ||
         text.toLowerCase().includes("<!doctype")
-      ) return;
+      )
+        return;
 
       await chrome.storage.local.clear();
-      chrome.storage.local.set({
-        eegDataText: text,
-        eegDataType: "text"
-      }, () => {
-        chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
-      });
+      chrome.storage.local.set(
+        {
+          eegDataText: text,
+          eegDataType: "text",
+        },
+        () => {
+          chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
+        }
+      );
     }
   } catch (error) {
-    console.error("❌ Fetch failed:", error);
+    console.error("Fetch failed:", error);
   }
 }
 
@@ -138,10 +163,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       try {
         const eegStorage = new EEGStorage();
         await eegStorage.clearAllData();
-        await eegStorage.storeTextFile(msg.text, msg.filename || "uploaded.txt");
-        chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") }, () => {
-          sendResponse({ success: true });
-        });
+        await eegStorage.storeTextFile(
+          msg.text,
+          msg.filename || "uploaded.txt"
+        );
+        chrome.tabs.create(
+          { url: chrome.runtime.getURL("viewer.html") },
+          () => {
+            sendResponse({ success: true });
+          }
+        );
       } catch (err) {
         sendResponse({ success: false, error: err.message });
       }
@@ -156,7 +187,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
         const buffer = await response.arrayBuffer();
         if (!isValidEEGBuffer(buffer)) {
-          console.warn("⛔ Not valid EEG (probably ECG) — not opening viewer");
+          console.warn("Not valid EEG (probably ECG) — not opening viewer");
           sendResponse({ success: false });
           responded = true;
           return;
@@ -166,12 +197,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await eegStorage.clearAllData();
         await eegStorage.storeEDFFile(buffer, msg.filename);
 
-        chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") }, () => {
-          sendResponse({ success: true });
-        });
+        chrome.tabs.create(
+          { url: chrome.runtime.getURL("viewer.html") },
+          () => {
+            sendResponse({ success: true });
+          }
+        );
         responded = true;
       } catch (err) {
-        console.error("❌ storeEDFURL error:", err);
+        console.error("storeEDFURL error:", err);
         if (!responded) {
           sendResponse({ success: false, error: err.message });
         }

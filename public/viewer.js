@@ -138,7 +138,7 @@ function initializeData(result) {
 
       eegData.signals = result.filtered;
       plotCurrentWindow();
-      alert("✅ Filter applied!");
+      alert("Filter applied!");
     } catch (err) {
       alert("Error applying filter: " + err.message);
     }
@@ -310,10 +310,10 @@ async function handlePsdToggle() {
 
 async function updatePSDPlot(selectedChannels) {
   const psdDiv = document.getElementById("psdPlot");
-  psdDiv.innerHTML = ""; // ✅ Clear any previous plot
+  psdDiv.innerHTML = ""; // Clear any previous plot
 
   if (!selectedChannels.length) {
-    alert("⚠️ Please select at least one channel to compute PSD.");
+    alert("Please select at least one channel to compute PSD.");
     return;
   }
 
