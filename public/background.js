@@ -1,4 +1,3 @@
-// Load EEGStorage class into background service worker
 importScripts('eegStorage.js');
 console.log("🚀 Background script loaded");
 
@@ -37,17 +36,38 @@ function isEEGDownload(url) {
   return false;
 }
 
-chrome.downloads.onCreated.addListener((downloadItem) => {
-  console.log("📥 Download detected:", downloadItem.url, downloadItem.filename);
+function isValidEEGBuffer(buffer) {
+  try {
+    const header = new TextDecoder().decode(buffer.slice(0, 256));
+    const ns = parseInt(header.slice(252, 256).trim());
+    if (isNaN(ns) || ns <= 0) return false;
 
+    const signalLabelsRaw = buffer.slice(256, 256 + ns * 16);
+    const signalLabels = new TextDecoder().decode(signalLabelsRaw).toLowerCase();
+
+    const eegKeywords = [
+      "eeg", "fp1", "fp2", "fz", "cz", "pz", "oz",
+      "f3", "f4", "c3", "c4", "p3", "p4",
+      "o1", "o2", "t3", "t4", "t5", "t6"
+    ];
+    const nonEEGKeywords = ["emg", "ecg", "eog", "abdomen", "direct"];
+
+    const hasEEG = eegKeywords.some(k => signalLabels.includes(k));
+    const isLikelyNotEEG = nonEEGKeywords.some(k => signalLabels.includes(k));
+
+    return hasEEG && !isLikelyNotEEG;
+  } catch (e) {
+    console.error("❌ Error in EDF EEG detection:", e);
+    return false;
+  }
+}
+
+chrome.downloads.onCreated.addListener((downloadItem) => {
   if (isEEGDownload(downloadItem.url)) {
     chrome.storage.local.get(["interceptEnabled"], (store) => {
       const enabled = store.interceptEnabled !== false;
-      console.log("🔧 Intercept enabled:", enabled);
-
       if (enabled) {
         chrome.downloads.cancel(downloadItem.id, () => {
-          console.log("🚫 Cancelled download:", downloadItem.url);
           handleDownload(downloadItem.url);
         });
       }
@@ -56,70 +76,50 @@ chrome.downloads.onCreated.addListener((downloadItem) => {
 });
 
 async function handleDownload(url) {
-  console.log("📡 Fetching intercepted file:", url);
   try {
-    const response = await fetch(url);
-    const contentType = response.headers.get("content-type") || "";
-
-    if (contentType.includes("text/html")) {
-      console.log("❌ Response is HTML, not file data - aborting");
-      return;
-    }
+    const response = await fetch(url, { redirect: "follow" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const isEDF = url.toLowerCase().endsWith(".edf");
 
     if (isEDF) {
       const arrayBuffer = await response.arrayBuffer();
-      await chrome.storage.local.clear();
-
-      chrome.storage.local.set(
-        {
-          eegDataBuffer: Array.from(new Uint8Array(arrayBuffer)),
-          eegDataType: "edf",
-        },
-        () => {
-          console.log("💾 EDF data stored, opening viewer");
-          chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
-        }
-      );
-    } else {
-      const text = await response.text();
-
-      if (
-        text.toLowerCase().includes("<!doctype") ||
-        text.toLowerCase().includes("<html")
-      ) {
-        console.log("❌ Content appears to be HTML, not EEG data");
+      if (!isValidEEGBuffer(arrayBuffer)) {
+        console.warn("⛔ Not valid EEG (probably ECG)");
         return;
       }
+      await chrome.storage.local.clear();
+      chrome.storage.local.set({
+        eegDataBuffer: Array.from(new Uint8Array(arrayBuffer)),
+        eegDataType: "edf"
+      }, () => {
+        chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
+      });
+    } else {
+      const text = await response.text();
+      if (
+        text.toLowerCase().includes("<html") ||
+        text.toLowerCase().includes("<!doctype")
+      ) return;
 
       await chrome.storage.local.clear();
-
-      chrome.storage.local.set(
-        {
-          eegDataText: text,
-          eegDataType: "text",
-        },
-        () => {
-          console.log("💾 Text data stored, opening viewer");
-          chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
-        }
-      );
+      chrome.storage.local.set({
+        eegDataText: text,
+        eegDataType: "text"
+      }, () => {
+        chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
+      });
     }
   } catch (error) {
-    console.error("❌ Failed to fetch:", error);
+    console.error("❌ Fetch failed:", error);
   }
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  console.log("📨 Message received:", msg.action);
-
   if (msg.action === "openViewer") {
     chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
     sendResponse({ success: true });
-  }
-
-  else if (msg.action === "toggleIntercept") {
+  } else if (msg.action === "toggleIntercept") {
     chrome.storage.local.get(["interceptEnabled"], (store) => {
       const newState = !store.interceptEnabled;
       chrome.storage.local.set({ interceptEnabled: newState }, () => {
@@ -127,69 +127,60 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       });
     });
     return true;
-  }
-
-  else if (msg.action === "getInterceptState") {
+  } else if (msg.action === "getInterceptState") {
     chrome.storage.local.get(["interceptEnabled"], (store) => {
       const enabled = store.interceptEnabled !== false;
       sendResponse({ enabled });
     });
     return true;
-  }
-
-  else if (msg.action === "storeTextEEG") {
-    console.log("📨 Background: storing text EEG from content script");
-
+  } else if (msg.action === "storeTextEEG") {
     (async () => {
       try {
         const eegStorage = new EEGStorage();
         await eegStorage.clearAllData();
         await eegStorage.storeTextFile(msg.text, msg.filename || "uploaded.txt");
-
-        console.log("✅ Text EEG stored in IndexedDB. Opening viewer...");
-
         chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") }, () => {
           sendResponse({ success: true });
         });
       } catch (err) {
-        console.error("❌ Failed to store EEG in background:", err);
         sendResponse({ success: false, error: err.message });
       }
     })();
-
     return true;
-  }
-
-  // ✅ NEW handler for EDF from content script
-  else if (msg.action === "storeEDFURL") {
-    console.log("📡 Fetching EDF file from URL:", msg.url);
-
+  } else if (msg.action === "storeEDFURL") {
     (async () => {
+      let responded = false;
       try {
-        const response = await fetch(msg.url);
+        const response = await fetch(msg.url, { redirect: "follow" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
         const buffer = await response.arrayBuffer();
+        if (!isValidEEGBuffer(buffer)) {
+          console.warn("⛔ Not valid EEG (probably ECG) — not opening viewer");
+          sendResponse({ success: false });
+          responded = true;
+          return;
+        }
 
         const eegStorage = new EEGStorage();
         await eegStorage.clearAllData();
         await eegStorage.storeEDFFile(buffer, msg.filename);
 
-        console.log("✅ Stored EDF file. Opening viewer...");
         chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") }, () => {
           sendResponse({ success: true });
         });
+        responded = true;
       } catch (err) {
-        console.error("❌ Failed to fetch/store EDF:", err);
-        sendResponse({ success: false, error: err.message });
+        console.error("❌ storeEDFURL error:", err);
+        if (!responded) {
+          sendResponse({ success: false, error: err.message });
+        }
       }
     })();
-
     return true;
   }
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("🧠 EEG Reader installed");
-  chrome.storage.local.set({ interceptEnabled: true }, () => {
-    console.log("✅ Default settings applied");
-  });
+  chrome.storage.local.set({ interceptEnabled: true });
 });

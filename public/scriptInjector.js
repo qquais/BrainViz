@@ -3,8 +3,7 @@
  * Runs in the page context to monitor link clicks and identify EEG files
  * 
  * @fileoverview Injected script that detects EEG file links and sends interception messages
- * @author EEG Reader Extension
- * @version 1.4
+ * @version: 1.5 - Updated July 16, 2025
  */
 
 console.log("🔧 Script injector loaded on:", window.location.hostname);
@@ -19,86 +18,66 @@ if (window.eegInterceptorInitialized) {
   const processedClicks = new Set();
 
   /**
-   * Analyzes a URL to determine if it represents an EEG file that should be intercepted
-   * Uses multiple heuristics including file extensions, URL patterns, and content indicators
+   * Analyze a URL to determine if it might be an EEG file.
+   * Uses file extension + ?download param as a rough guess (not real validation).
    * 
-   * @param {string} url - The URL to analyze for EEG file characteristics  
-   * @returns {boolean} True if the URL should be intercepted as an EEG file
-   * 
-   * @example
-   * isEEGFile('https://physionet.org/files/data.txt') // true
-   * isEEGFile('https://physionet.org/content/dataset/page.txt') // false (content page)
-   * isEEGFile('https://example.com/data.txt?download=1') // true (has download param)
+   * @param {string} url
+   * @returns {boolean}
    */
   function isEEGFile(url) {
     if (!url) return false;
-    
-    // Remove query parameters for checking
+
     const urlWithoutParams = url.split('?')[0];
-    const hasEEGExtension = urlWithoutParams.endsWith('.txt') || 
-                           urlWithoutParams.endsWith('.edf') ||
-                           urlWithoutParams.endsWith('.csv');
-    
-    // Also check if URL contains EEG-related patterns
-    const hasEEGPattern = url.includes('.txt') || 
-                         url.includes('eeg') ||
-                         url.includes('EEG') ||
-                         url.includes('RECORDS');
-    
-    // Check for download parameter (PhysioNet style)
+    const hasEEGExtension =
+      urlWithoutParams.endsWith('.txt') ||
+      urlWithoutParams.endsWith('.edf') ||
+      urlWithoutParams.endsWith('.csv');
+
+    const hasEEGPattern = url.toLowerCase().includes('eeg') || 
+                          url.toLowerCase().includes('records');
+
     const hasDownloadParam = url.includes('?download') || url.includes('&download');
-    
-    // const isEEG = hasEEGExtension || (hasEEGPattern && hasDownloadParam);
-    const isEEG = hasEEGExtension && hasDownloadParam;
-    
-    console.log("🔍 URL analysis:", {
-      url: url,
-      urlWithoutParams: urlWithoutParams,
-      hasEEGExtension: hasEEGExtension,
-      hasEEGPattern: hasEEGPattern,
-      hasDownloadParam: hasDownloadParam,
-      isEEG: isEEG
+
+    const extensionMatchOnly = hasEEGExtension && hasDownloadParam;
+
+    console.log("🔍 URL extension-based guess (not real EEG check):", {
+      url,
+      extensionMatched: extensionMatchOnly,
+      hasEEGExtension,
+      hasDownloadParam,
+      hasEEGPattern
     });
-    
-    return isEEG;
+
+    return extensionMatchOnly;
   }
 
   /**
-   * Handles link click events to detect and intercept EEG file downloads
-   * Prevents default behavior for EEG files and sends interception message
-   * 
-   * @param {MouseEvent} e - The click event on a link element
-   * @returns {boolean|void} False if event was intercepted, void otherwise
-   * 
-   * @listens document.click
+   * Intercept link click events and trigger EEG capture if matched.
    */
-function handleLinkClick(e) {
-  const link = e.target.closest('a');
-  if (!link) return;
+  function handleLinkClick(e) {
+    const link = e.target.closest('a');
+    if (!link) return;
 
-  const href = link.href || link.getAttribute('href');
-  const isEEG = isEEGFile(href); // your existing heuristics
+    const href = link.href || link.getAttribute('href');
+    const matched = isEEGFile(href);
 
-  console.log("🔍 Link clicked:", href, "isEEG:", isEEG);
+    console.log("📎 Link clicked:", href, "→ extension match:", matched);
 
-  if (isEEG) {
-    // Only prevent default if we're going to handle it
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
+    if (matched) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
 
-    console.log("🧠 Intercepted EEG link click:", href);
-    window.postMessage({ type: "EEG_INTERCEPT", href }, "*");
-    return false;
+      console.log("🧠 EEG candidate link intercepted:", href);
+      window.postMessage({ type: "EEG_INTERCEPT", href }, "*");
+      return false;
+    }
   }
-}
 
-
-  // Single event listener for all cases
-  document.addEventListener('click', handleLinkClick, { 
-    capture: true, 
-    passive: false 
+  document.addEventListener('click', handleLinkClick, {
+    capture: true,
+    passive: false
   });
 
-  console.log("✅ EEG interceptor initialized with enhanced URL detection");
+  console.log("✅ EEG interceptor initialized with safe extension-based detection");
 }
