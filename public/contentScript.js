@@ -79,12 +79,9 @@ function initializeEEGInterceptor() {
             filename: fileName,
           },
           (res) => {
-            console.log("📨 Background response:", res);
+            console.log("Background response:", res);
             if (res?.success === false) {
-              console.warn(
-                "Not EEG — allow default browser download:",
-                href
-              );
+              console.warn("Not EEG — allow default browser download:", href);
               window.location.href = href;
             }
           }
