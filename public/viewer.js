@@ -6,6 +6,8 @@ let currentFileName = "Unknown File";
 let isStackedView = true;
 let psdVisible = false;
 
+const FLASK_API = "https://brainviz.onrender.com";
+
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     await initializeViewer();
@@ -57,7 +59,7 @@ async function sendToFlaskAndLoadSignals(bufferArray) {
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
-    const response = await fetch("http://localhost:5000/edf-preview", {
+    const response = await fetch("FLASK_API/edf-preview", {
       method: "POST",
       body: formData,
     });
@@ -77,7 +79,7 @@ async function sendTextToFlaskAndLoadSignals(text) {
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
-    const response = await fetch("http://localhost:5000/txt-preview", {
+    const response = await fetch("FLASK_API/txt-preview", {
       method: "POST",
       body: formData,
     });
@@ -121,7 +123,7 @@ document.getElementById("applyFilter").addEventListener("click", async () => {
   const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
 
   try {
-    const res = await fetch("http://localhost:5000/filter-signal", {
+    const res = await fetch("FLASK_API/filter-signal", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -172,7 +174,7 @@ document.getElementById("rejectorSelect").addEventListener("change", async (e) =
     }
   } else if (value === "50" || value === "60") {
     try {
-      const res = await fetch("http://localhost:5000/filter-signal", {
+      const res = await fetch("FLASK_API/filter-signal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -382,7 +384,7 @@ async function updatePSDPlot(selectedChannels) {
     );
     const selectedSignals = selectedIndices.map((i) => eegData.signals[i]);
 
-    const res = await fetch("http://localhost:5000/psd", {
+    const res = await fetch("FLASK_API/psd", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
