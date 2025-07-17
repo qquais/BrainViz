@@ -12,7 +12,7 @@
     "unlimitedStorage"
   ],
   "host_permissions": [
-    "https://brainviz.onrender.com/*",
+    "https://brainviz.opensource.mieweb.org/*",
     "*://*/*",
     "*://physionet.org/*",
     "*://*.physionet.org/*"
