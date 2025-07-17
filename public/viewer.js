@@ -59,7 +59,7 @@ async function sendToFlaskAndLoadSignals(bufferArray) {
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
-    const response = await fetch("FLASK_API/edf-preview", {
+    const response = await fetch("https://brainviz.onrender.com/edf-preview", {
       method: "POST",
       body: formData,
     });
@@ -79,7 +79,7 @@ async function sendTextToFlaskAndLoadSignals(text) {
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
-    const response = await fetch("FLASK_API/txt-preview", {
+    const response = await fetch("https://brainviz.onrender.com/txt-preview", {
       method: "POST",
       body: formData,
     });
@@ -123,7 +123,7 @@ document.getElementById("applyFilter").addEventListener("click", async () => {
   const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
 
   try {
-    const res = await fetch("FLASK_API/filter-signal", {
+    const res = await fetch("https://brainviz.onrender.com/filter-signal", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -174,7 +174,7 @@ document.getElementById("rejectorSelect").addEventListener("change", async (e) =
     }
   } else if (value === "50" || value === "60") {
     try {
-      const res = await fetch("FLASK_API/filter-signal", {
+      const res = await fetch("https://brainviz.onrender.com/filter-signal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -384,7 +384,7 @@ async function updatePSDPlot(selectedChannels) {
     );
     const selectedSignals = selectedIndices.map((i) => eegData.signals[i]);
 
-    const res = await fetch("FLASK_API/psd", {
+    const res = await fetch("https://brainviz.onrender.com/psd", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
