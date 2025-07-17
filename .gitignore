@@ -4,14 +4,42 @@
 # VS Code settings
 .vscode/
 
-# Node modules (if added later for bundling)
-node_modules/
+# Python bytecode and virtualenvs
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+env/
+venv/
+
+# Python packaging
+*.egg-info/
+.eggs/
+
+# Environment configs
+*.env
+.env
 
 # Logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Jupyter
+.ipynb_checkpoints/
+
+# Node modules (if added later for bundling)
+node_modules/
+
 # Build artifacts (if you zip extension)
 dist/
 *.zip
+*.crx
+*.pem
+
+# IDE/project configs
+.idea/
+*.sublime-project
+*.sublime-workspace
