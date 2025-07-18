@@ -18,7 +18,12 @@ def home():
 
 @app.route('/ping')
 def ping():
+    app.logger.info("Ping received")
     return jsonify({"status": "alive"})
+
+# @app.route('/ping')
+# def ping():
+#     return jsonify({"status": "alive"})
 
 @app.route('/edf-preview', methods=['POST'])
 def edf_preview():
