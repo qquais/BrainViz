@@ -67,7 +67,7 @@ async function sendToFlaskAndLoadSignals(bufferArray) {
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
-    const response = await fetch("https://brainviz.opensource.mieweb.org/edf-preview", {
+    const response = await fetch(`${FLASK_API}/edf-preview`, {
       method: "POST",
       body: formData,
     });
@@ -87,7 +87,7 @@ async function sendTextToFlaskAndLoadSignals(text) {
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
-    const response = await fetch("https://brainviz.opensource.mieweb.org/txt-preview", {
+    const response = await fetch(`${FLASK_API}/txt-preview`, {
       method: "POST",
       body: formData,
     });
@@ -147,7 +147,7 @@ function initializeData(result) {
     const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
 
     try {
-      const res = await fetch("https://brainviz.opensource.mieweb.org/filter-signal", {
+      const res = await fetch(`${FLASK_API}/filter-signal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -195,7 +195,7 @@ function initializeData(result) {
       }
     } else if (value === "50" || value === "60") {
       try {
-        const res = await fetch("https://brainviz.opensource.mieweb.org/filter-signal", {
+        const res = await fetch(`${FLASK_API}/filter-signal`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -650,7 +650,7 @@ async function updatePSDPlot(selectedChannels) {
     );
     const selectedSignals = selectedIndices.map((i) => eegData.signals[i]);
 
-    const res = await fetch("https://brainviz.opensource.mieweb.org/psd", {
+    const res = await fetch(`${FLASK_API}/psd`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
