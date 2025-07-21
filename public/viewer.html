@@ -166,32 +166,42 @@
     <div id="psdPlot"></div>
 
     <!-- Bottom control bar -->
-    <div id="bottomControls">
+    <div id="bottomControls" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+
+      <!-- Rejector -->
+      <label for="rejectorSelect"><strong>Rejector:</strong></label>
       <select id="rejectorSelect">
-        <option disabled selected>Rejector</option>
         <option value="off">Off</option>
         <option value="50">50 Hz</option>
         <option value="60">60 Hz</option>
       </select>
+
+      <!-- Filter Type -->
+      <label for="filterType"><strong>Filter:</strong></label>
       <select id="filterType">
         <option value="none">None</option>
         <option value="bandpass">Bandpass</option>
         <option value="highpass">High-pass</option>
         <option value="lowpass">Low-pass</option>
       </select>
+
+      <!-- Filter frequency inputs -->
       <input type="number" id="lowFreq" placeholder="Low Freq (Hz)" />
       <input type="number" id="highFreq" placeholder="High Freq (Hz)" />
       <button id="applyFilter">Apply</button>
 
+      <!-- Time Window -->
       <label for="windowSlider"><strong>Time Window:</strong></label>
       <input type="range" id="windowSlider" min="0" max="100" step="1" value="0" />
       <span id="windowTimeLabel">0–10s</span>
 
+      <!-- PSD Button -->
       <button id="showPsdBtn">Show PSD</button>
-    </div>
-  </div>
 
-  <script src="viewer.js"></script>
+    </div>
+
+
+    <script src="viewer.js"></script>
 </body>
 
 </html>

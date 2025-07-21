@@ -195,9 +195,6 @@ document.getElementById("rejectorSelect").addEventListener("change", async (e) =
       console.error("Rejector error:", err.message);
     }
   }
-
-  // Reset dropdown back to label
-  e.target.selectedIndex = 0;
 });
 
 
