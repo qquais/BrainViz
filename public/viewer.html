@@ -69,8 +69,6 @@
       flex-direction: column;
       background: white;
       height: 100vh;
-      overflow-y: auto;
-      scroll-behavior: smooth;
     }
 
     #fileTitle {
@@ -97,12 +95,31 @@
     #plot {
       flex: 1;
       background: white;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    /* Timeline Slider - Simple positioning above controls */
+    #timelineContainer {
+      background: #f8f8f8;
+      border-top: 1px solid #ddd;
+      border-bottom: 1px solid #ddd;
+      padding: 5px 15px;
+      height: 40px;
+      min-height: 40px;
+    }
+
+    #eegTimeSlider {
+      width: 100%;
+      height: 30px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      background: #fff;
+      display: block;
+      border-radius: 2px;
     }
 
     #bottomControls {
-      position: sticky;
-      bottom: 0;
-      z-index: 999;
       background: #f8f8f8;
       padding: 10px 15px;
       border-top: 1px solid #ccc;
@@ -117,10 +134,6 @@
     #bottomControls button {
       padding: 6px;
       font-size: 14px;
-    }
-
-    #windowSlider {
-      flex: 1;
     }
 
     .loading {
@@ -165,8 +178,13 @@
 
     <div id="psdPlot"></div>
 
+    <!-- Timeline Container - Fixed Above Controls -->
+    <div id="timelineContainer">
+      <canvas id="eegTimeSlider" width="800" height="30"></canvas>
+    </div>
+
     <!-- Bottom control bar -->
-    <div id="bottomControls" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;">
+    <div id="bottomControls">
 
       <!-- Rejector -->
       <label for="rejectorSelect"><strong>Rejector:</strong></label>
@@ -190,18 +208,13 @@
       <input type="number" id="highFreq" placeholder="High Freq (Hz)" />
       <button id="applyFilter">Apply</button>
 
-      <!-- Time Window -->
-      <label for="windowSlider"><strong>Time Window:</strong></label>
-      <input type="range" id="windowSlider" min="0" max="100" step="1" value="0" />
-      <span id="windowTimeLabel">0–10s</span>
-
       <!-- PSD Button -->
       <button id="showPsdBtn">Show PSD</button>
 
     </div>
 
-
     <script src="viewer.js"></script>
+  </div>
 </body>
 
 </html>
