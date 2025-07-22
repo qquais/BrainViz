@@ -41,5 +41,10 @@
   "action": {
     "default_popup": "index.html",
     "default_title": "EEG Reader"
+  },
+  "icons": {
+    "16": "icons/Brainviz16.png",
+    "48": "icons/Brainviz48.png",
+    "128": "icons/Brainviz128.png"
   }
 }
