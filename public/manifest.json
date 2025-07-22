@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "EEG TXT Reader",
-  "version": "1.5",
-  "description": "Read and visualize EEG signals from .txt and .edf files with enhanced storage",
+  "version": "1.0.0",
+  "description": "Read and visualize EEG signals from .txt and .edf files.",
   "permissions": [
     "storage",
     "tabs",
@@ -13,7 +13,6 @@
   ],
   "host_permissions": [
     "https://brainviz.opensource.mieweb.org/*",
-    "*://*/*",
     "*://physionet.org/*",
     "*://*.physionet.org/*"
   ],

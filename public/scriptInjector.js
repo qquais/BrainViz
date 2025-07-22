@@ -3,7 +3,7 @@
  * Runs in the page context to monitor link clicks and identify EEG files
  * 
  * @fileoverview Injected script that detects EEG file links and sends interception messages
- * @version: 1.5 - Updated July 16, 2025
+ * @version: 1.5
  */
 
 console.log("Script injector loaded on:", window.location.hostname);
@@ -19,7 +19,6 @@ if (window.eegInterceptorInitialized) {
 
   /**
    * Analyze a URL to determine if it might be an EEG file.
-   * Uses file extension + ?download param as a rough guess (not real validation).
    * 
    * @param {string} url
    * @returns {boolean}

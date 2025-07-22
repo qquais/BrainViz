@@ -5,8 +5,6 @@ let maxWindow = 0;
 let currentFileName = "Unknown File";
 let isStackedView = true;
 let psdVisible = false;
-
-// Canvas slider variables
 let timeSliderCanvas = null;
 let sliderCtx = null;
 let dragging = false;
@@ -105,11 +103,9 @@ function initializeData(result) {
   eegData = result;
   sampleRate = result.sample_rate;
   totalDurationSec = Math.floor(result.signals[0].length / sampleRate);
-  
-  // For longer recordings, keep 10-second window but allow scrolling through entire duration
-  windowSize = 10;  // Fixed 10-second viewing window
+  windowSize = 10;
   maxWindow = Math.max(0, totalDurationSec - windowSize);
-  windowStartSec = 0; // Start at beginning
+  windowStartSec = 0;
   
   console.log("EEG Data initialized:", {
     totalDurationSec: totalDurationSec.toFixed(1),
@@ -220,7 +216,6 @@ function initializeData(result) {
   document.getElementById("showPsdBtn").addEventListener("click", handlePsdToggle);
 }
 
-// Enhanced Canvas-based Time Slider Implementation - Fixed Version
 function initEEGTimeSlider() {
   timeSliderCanvas = document.getElementById("eegTimeSlider");
   if (!timeSliderCanvas) {
@@ -229,16 +224,10 @@ function initEEGTimeSlider() {
   }
   
   sliderCtx = timeSliderCanvas.getContext("2d");
-  
-  // Force canvas to be visible and get proper dimensions
   const container = timeSliderCanvas.parentElement;
   const containerRect = container.getBoundingClientRect();
-  
-  // Set explicit canvas size
   timeSliderCanvas.style.width = '100%';
   timeSliderCanvas.style.height = '30px';
-  
-  // Set canvas resolution for crisp rendering
   const rect = timeSliderCanvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
   
@@ -255,12 +244,9 @@ function initEEGTimeSlider() {
   
   drawSlider();
   
-  // Event listeners
   timeSliderCanvas.addEventListener("mousedown", onSliderMouseDown);
   window.addEventListener("mouseup", () => (dragging = false));
   window.addEventListener("mousemove", onSliderMouseMove);
-  
-  // Keyboard navigation for professional EEG navigation
   document.addEventListener("keydown", handleKeyNavigation);
   
   // Handle window resize
@@ -275,12 +261,11 @@ function initEEGTimeSlider() {
   });
 }
 
-// Professional keyboard navigation like Neurosoft
 function handleKeyNavigation(e) {
   if (!eegData) return;
   
   let moved = false;
-  const step = 1; // 1 second steps
+  const step = 1;
   
   switch(e.key) {
     case "ArrowLeft":
@@ -340,14 +325,9 @@ function drawSlider() {
   
   console.log("Drawing slider:", { width, height, totalDurationSec, windowStartSec, maxWindow });
   
-  // Clear canvas
   sliderCtx.clearRect(0, 0, width, height);
-  
-  // Background - exact Neurosoft style
   sliderCtx.fillStyle = "#f8f8f8";
   sliderCtx.fillRect(0, 0, width, height);
-  
-  // Border
   sliderCtx.strokeStyle = "#ddd";
   sliderCtx.lineWidth = 1;
   sliderCtx.strokeRect(0, 0, width, height);
@@ -357,9 +337,8 @@ function drawSlider() {
     return;
   }
   
-  // Calculate time markers - exactly like Neurosoft
   const timeSpan = totalDurationSec;
-  let majorInterval = 10; // Default intervals
+  let majorInterval = 10; 
   
   // Adjust intervals based on duration for optimal display
   if (timeSpan > 3600) majorInterval = 300; // 5 minutes for very long recordings
@@ -398,14 +377,13 @@ function drawSlider() {
     }
   }
   
-  // Draw time labels at bottom - Neurosoft style
   sliderCtx.font = "9px Arial";
   sliderCtx.fillStyle = "#666";
   sliderCtx.textAlign = "center";
   
   for (let t = 0; t <= timeSpan; t += majorInterval) {
     const x = (t / timeSpan) * width;
-    if (x < width - 30) { // Don't draw too close to edge
+    if (x < width - 30) {
       sliderCtx.fillText(formatTime(t), x, height - 2);
     }
   }
@@ -417,7 +395,6 @@ function drawSlider() {
   
   console.log("Window position:", { windowStartX, windowEndX, windowWidth });
   
-  // Draw current viewing window - blue highlight like Neurosoft
   sliderCtx.fillStyle = "rgba(66, 133, 244, 0.3)";
   sliderCtx.fillRect(windowStartX, 0, windowWidth, height);
   

@@ -1,7 +1,0 @@
-services:
-  - type: web
-    name: eeg-mcp-server
-    env: python
-    plan: free
-    buildCommand: "pip install -r flask-server/requirements.txt"
-    startCommand: "python flask-server/mcp_server.py"
