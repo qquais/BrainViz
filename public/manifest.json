@@ -12,9 +12,7 @@
     "unlimitedStorage"
   ],
   "host_permissions": [
-    "https://brainviz.opensource.mieweb.org/*",
-    "*://physionet.org/*",
-    "*://*.physionet.org/*"
+    "https://brainviz.opensource.mieweb.org/*"
   ],
   "background": {
     "service_worker": "background.js"
