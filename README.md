@@ -137,6 +137,8 @@ This server (via `mcp_server.py`) performs EEG preprocessing:
 
 ## ⚠️ Known Issues
 
+- Uploads were failing due to NGINX's default client_max_body_size (1MB). Fixed by increasing it to 150M to support larger EEG files.
+
 - Interception may fail if page disables content scripts or uses custom download logic.
 
 ## 🧰 Troubleshooting
