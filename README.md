@@ -179,7 +179,7 @@ This extension processes EEG files locally in your browser and communicates only
 
 ## Acknowledgments
 
-* Built by [MIE](https://www.mieweb.org)
+* Built by [MIE](https://mieweb.org/)
 * Uses [MNE-Python](https://mne.tools/stable/index.html) (via backend)
 * EEG dataset support tested on [PhysioNet](https://physionet.org/)
 * Powered by [Plotly.js](https://plotly.com/javascript/)
