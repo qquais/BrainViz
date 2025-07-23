@@ -9,7 +9,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     console.log("EEG Storage initialized");
   } catch (error) {
     console.error("Failed to initialize EEG Storage:", error);
-    // Continue without storage helper for basic functionality
     console.log("Continuing without IndexedDB support");
   }
 
@@ -56,7 +55,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   });
 
-  // Simplified EDF handling without complex validation
   async function handleEDFFileSimple(file) {
     console.log("Processing EDF file (simple method):", file.name);
 
@@ -86,7 +84,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   }
 
-  // Simplified text handling
   async function handleTextFileSimple(file) {
     console.log("Processing text file:", file.name);
 
@@ -111,28 +108,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   }
 
-  // Enhanced storage function with error handling
-  function setStorageData(data) {
-    return new Promise((resolve, reject) => {
-      console.log("Storing data:", Object.keys(data));
-
-      chrome.storage.local.set(data, () => {
-        if (chrome.runtime.lastError) {
-          console.error("Storage error:", chrome.runtime.lastError);
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          console.log("Data stored successfully");
-          // Verify storage worked
-          chrome.storage.local.get(Object.keys(data), (result) => {
-            console.log("Verification - stored keys:", Object.keys(result));
-            resolve();
-          });
-        }
-      });
-    });
-  }
-
-  // Storage helper loading (optional)
   async function loadStorageHelper() {
     if (typeof EEGStorage !== "undefined") {
       console.log("Storage helper already loaded");
@@ -158,21 +133,16 @@ document.addEventListener("DOMContentLoaded", async function () {
     });
   }
 
-  // Clear data button
   const clearDataBtn = document.getElementById("clearDataBtn");
   if (clearDataBtn) {
     clearDataBtn.addEventListener("click", async function () {
       try {
         clearDataBtn.textContent = "Clearing...";
         clearDataBtn.disabled = true;
-
-        // Clear Chrome storage
         chrome.storage.local.clear(() => {
           console.log("Chrome storage cleared");
           alert("All data cleared successfully!");
         });
-
-        // Clear IndexedDB if available
         if (eegStorage) {
           await eegStorage.clearAllData();
         }
@@ -185,8 +155,6 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
     });
   }
-
-  // Toggle functionality (existing code)
   const interceptToggle = document.getElementById("interceptToggle");
   const interceptStatus = document.getElementById("interceptStatus");
 
@@ -215,7 +183,6 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   }
 
-  // Get initial state
   chrome.runtime.sendMessage(
     { action: "getInterceptState" },
     function (response) {

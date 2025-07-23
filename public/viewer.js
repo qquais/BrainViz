@@ -5,6 +5,14 @@ let maxWindow = 0;
 let currentFileName = "Unknown File";
 let isStackedView = true;
 let psdVisible = false;
+let timeSliderCanvas = null;
+let sliderCtx = null;
+let dragging = false;
+let windowStartSec = 0;
+let totalDurationSec = 0;
+
+const FLASK_API = "https://brainviz.opensource.mieweb.org";
+console.log("Using EEG API:", FLASK_API);
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
@@ -57,7 +65,7 @@ async function sendToFlaskAndLoadSignals(bufferArray) {
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
-    const response = await fetch("http://localhost:5000/edf-preview", {
+    const response = await fetch(`${FLASK_API}/edf-preview`, {
       method: "POST",
       body: formData,
     });
@@ -77,7 +85,7 @@ async function sendTextToFlaskAndLoadSignals(text) {
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
-    const response = await fetch("http://localhost:5000/txt-preview", {
+    const response = await fetch(`${FLASK_API}/txt-preview`, {
       method: "POST",
       body: formData,
     });
@@ -94,15 +102,29 @@ async function sendTextToFlaskAndLoadSignals(text) {
 function initializeData(result) {
   eegData = result;
   sampleRate = result.sample_rate;
-  maxWindow = Math.max(
-    0,
-    Math.floor(result.signals[0].length / sampleRate) - windowSize
-  );
-  document.getElementById("fileLabel").textContent = `File: ${currentFileName}`;
+  totalDurationSec = Math.floor(result.signals[0].length / sampleRate);
+  windowSize = 10;
+  maxWindow = Math.max(0, totalDurationSec - windowSize);
+  windowStartSec = 0;
+  
+  console.log("EEG Data initialized:", {
+    totalDurationSec: totalDurationSec.toFixed(1),
+    maxWindow: maxWindow.toFixed(1),
+    signalLength: result.signals[0].length,
+    sampleRate,
+    windowSize,
+    channels: result.channel_names.length
+  });
+  
+  document.getElementById("fileLabel").textContent = `File: ${currentFileName} (${totalDurationSec.toFixed(0)}s)`;
   populateChannelList(result.channel_names);
-  configureSlider();
-  document.getElementById("toggleViewBtn").textContent =
-    "Switch to Compact View";
+  
+  // Initialize slider after a small delay to ensure DOM is ready
+  setTimeout(() => {
+    initEEGTimeSlider();
+  }, 100);
+  
+  document.getElementById("toggleViewBtn").textContent = "Switch to Compact View";
   plotCurrentWindow();
 
   document.getElementById("toggleViewBtn").onclick = () => {
@@ -113,73 +135,23 @@ function initializeData(result) {
     plotCurrentWindow();
   };
 
-document.getElementById("applyFilter").addEventListener("click", async () => {
-  const type = document.getElementById("filterType").value;
-  if (type === "none") return;
+  document.getElementById("applyFilter").addEventListener("click", async () => {
+    const type = document.getElementById("filterType").value;
+    if (type === "none") return;
 
-  const l_freq = parseFloat(document.getElementById("lowFreq").value || "0");
-  const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
+    const l_freq = parseFloat(document.getElementById("lowFreq").value || "0");
+    const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
 
-  try {
-    const res = await fetch("http://localhost:5000/filter-signal", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        signals: eegData.signals,
-        sample_rate: sampleRate,
-        filter_type: type,
-        l_freq: isNaN(l_freq) ? null : l_freq,
-        h_freq: isNaN(h_freq) ? null : h_freq,
-      }),
-    });
-
-    const result = await res.json();
-    if (result.error) throw new Error(result.error);
-
-    eegData.signals = result.filtered;
-    plotCurrentWindow();
-    // Removed: alert("Filter applied!");
-  } catch (err) {
-    alert("Error applying filter: " + err.message);
-  }
-});
-
-
-document.getElementById("rejectorSelect").addEventListener("change", async (e) => {
-  const value = e.target.value;
-
-  if (value === "off") {
-    // Reload original signals from storage
-    const eegStore = new EEGStorage();
-    const edfData = await eegStore.getEDFFile();
-    if (edfData?.data) {
-      await sendToFlaskAndLoadSignals(edfData.data);
-    } else {
-      const db = await eegStore.openDB();
-      const tx = db.transaction(["eegFiles"], "readonly");
-      const store = tx.objectStore("eegFiles");
-      const request = store.get("current_text");
-
-      const textResult = await new Promise((resolve, reject) => {
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-
-      db.close();
-      if (textResult?.data) {
-        await sendTextToFlaskAndLoadSignals(textResult.data);
-      }
-    }
-  } else if (value === "50" || value === "60") {
     try {
-      const res = await fetch("http://localhost:5000/filter-signal", {
+      const res = await fetch(`${FLASK_API}/filter-signal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           signals: eegData.signals,
           sample_rate: sampleRate,
-          filter_type: "notch",
-          l_freq: parseFloat(value),
+          filter_type: type,
+          l_freq: isNaN(l_freq) ? null : l_freq,
+          h_freq: isNaN(h_freq) ? null : h_freq,
         }),
       });
 
@@ -189,18 +161,309 @@ document.getElementById("rejectorSelect").addEventListener("change", async (e) =
       eegData.signals = result.filtered;
       plotCurrentWindow();
     } catch (err) {
-      console.error("Rejector error:", err.message);
+      alert("Error applying filter: " + err.message);
+    }
+  });
+
+  document.getElementById("rejectorSelect").addEventListener("change", async (e) => {
+    const value = e.target.value;
+
+    if (value === "off") {
+      const eegStore = new EEGStorage();
+      const edfData = await eegStore.getEDFFile();
+      if (edfData?.data) {
+        await sendToFlaskAndLoadSignals(edfData.data);
+      } else {
+        const db = await eegStore.openDB();
+        const tx = db.transaction(["eegFiles"], "readonly");
+        const store = tx.objectStore("eegFiles");
+        const request = store.get("current_text");
+
+        const textResult = await new Promise((resolve, reject) => {
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+
+        db.close();
+        if (textResult?.data) {
+          await sendTextToFlaskAndLoadSignals(textResult.data);
+        }
+      }
+    } else if (value === "50" || value === "60") {
+      try {
+        const res = await fetch(`${FLASK_API}/filter-signal`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            signals: eegData.signals,
+            sample_rate: sampleRate,
+            filter_type: "notch",
+            l_freq: parseFloat(value),
+          }),
+        });
+
+        const result = await res.json();
+        if (result.error) throw new Error(result.error);
+
+        eegData.signals = result.filtered;
+        plotCurrentWindow();
+      } catch (err) {
+        console.error("Rejector error:", err.message);
+      }
+    }
+  });
+
+  document.getElementById("showPsdBtn").addEventListener("click", handlePsdToggle);
+}
+
+function initEEGTimeSlider() {
+  timeSliderCanvas = document.getElementById("eegTimeSlider");
+  if (!timeSliderCanvas) {
+    console.error("Timeline canvas not found!");
+    return;
+  }
+  
+  sliderCtx = timeSliderCanvas.getContext("2d");
+  const container = timeSliderCanvas.parentElement;
+  const containerRect = container.getBoundingClientRect();
+  timeSliderCanvas.style.width = '100%';
+  timeSliderCanvas.style.height = '30px';
+  const rect = timeSliderCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  
+  timeSliderCanvas.width = rect.width * dpr;
+  timeSliderCanvas.height = rect.height * dpr;
+  
+  sliderCtx.scale(dpr, dpr);
+  
+  console.log("Canvas initialized:", {
+    width: rect.width,
+    height: rect.height,
+    totalDuration: totalDurationSec
+  });
+  
+  drawSlider();
+  
+  timeSliderCanvas.addEventListener("mousedown", onSliderMouseDown);
+  window.addEventListener("mouseup", () => (dragging = false));
+  window.addEventListener("mousemove", onSliderMouseMove);
+  document.addEventListener("keydown", handleKeyNavigation);
+  
+  // Handle window resize
+  window.addEventListener("resize", () => {
+    setTimeout(() => {
+      const newRect = timeSliderCanvas.getBoundingClientRect();
+      timeSliderCanvas.width = newRect.width * dpr;
+      timeSliderCanvas.height = newRect.height * dpr;
+      sliderCtx.scale(dpr, dpr);
+      drawSlider();
+    }, 100);
+  });
+}
+
+function handleKeyNavigation(e) {
+  if (!eegData) return;
+  
+  let moved = false;
+  const step = 1;
+  
+  switch(e.key) {
+    case "ArrowLeft":
+      e.preventDefault();
+      windowStartSec = Math.max(0, windowStartSec - step);
+      moved = true;
+      break;
+    case "ArrowRight":
+      e.preventDefault();
+      windowStartSec = Math.min(maxWindow, windowStartSec + step);
+      moved = true;
+      break;
+    case "PageUp":
+      e.preventDefault();
+      windowStartSec = Math.max(0, windowStartSec - windowSize);
+      moved = true;
+      break;
+    case "PageDown":
+      e.preventDefault();
+      windowStartSec = Math.min(maxWindow, windowStartSec + windowSize);
+      moved = true;
+      break;
+    case "Home":
+      e.preventDefault();
+      windowStartSec = 0;
+      moved = true;
+      break;
+    case "End":
+      e.preventDefault();
+      windowStartSec = maxWindow;
+      moved = true;
+      break;
+  }
+  
+  if (moved) {
+    console.log(`Keyboard navigation: moved to ${windowStartSec.toFixed(1)}s`);
+    drawSlider();
+    plotCurrentWindow();
+  }
+}
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function drawSlider() {
+  if (!timeSliderCanvas || !sliderCtx) {
+    console.error("Canvas or context not available");
+    return;
+  }
+  
+  const rect = timeSliderCanvas.getBoundingClientRect();
+  const width = rect.width;
+  const height = rect.height;
+  
+  console.log("Drawing slider:", { width, height, totalDurationSec, windowStartSec, maxWindow });
+  
+  sliderCtx.clearRect(0, 0, width, height);
+  sliderCtx.fillStyle = "#f8f8f8";
+  sliderCtx.fillRect(0, 0, width, height);
+  sliderCtx.strokeStyle = "#ddd";
+  sliderCtx.lineWidth = 1;
+  sliderCtx.strokeRect(0, 0, width, height);
+  
+  if (totalDurationSec <= 0) {
+    console.warn("Invalid total duration:", totalDurationSec);
+    return;
+  }
+  
+  const timeSpan = totalDurationSec;
+  let majorInterval = 10; 
+  
+  // Adjust intervals based on duration for optimal display
+  if (timeSpan > 3600) majorInterval = 300; // 5 minutes for very long recordings
+  else if (timeSpan > 1800) majorInterval = 180; // 3 minutes
+  else if (timeSpan > 600) majorInterval = 60; // 1 minute
+  else if (timeSpan > 300) majorInterval = 30; // 30 seconds
+  else if (timeSpan > 120) majorInterval = 20; // 20 seconds
+  else if (timeSpan > 60) majorInterval = 10; // 10 seconds
+  else if (timeSpan > 30) majorInterval = 5;  // 5 seconds
+  else majorInterval = Math.max(1, Math.ceil(timeSpan / 10)); // At least 10 divisions
+  
+  // Draw vertical time lines - Neurosoft style
+  sliderCtx.strokeStyle = "#ccc";
+  sliderCtx.lineWidth = 1;
+  
+  for (let t = 0; t <= timeSpan; t += majorInterval) {
+    const x = (t / timeSpan) * width;
+    
+    // Major vertical line
+    sliderCtx.beginPath();
+    sliderCtx.moveTo(x, 0);
+    sliderCtx.lineTo(x, height);
+    sliderCtx.stroke();
+  }
+  
+  // Draw minor vertical lines for better granularity
+  sliderCtx.strokeStyle = "#e5e5e5";
+  const minorInterval = majorInterval / (majorInterval > 60 ? 4 : 2);
+  for (let t = minorInterval; t < timeSpan; t += minorInterval) {
+    if (t % majorInterval !== 0) {
+      const x = (t / timeSpan) * width;
+      sliderCtx.beginPath();
+      sliderCtx.moveTo(x, height - 8);
+      sliderCtx.lineTo(x, height);
+      sliderCtx.stroke();
     }
   }
+  
+  sliderCtx.font = "9px Arial";
+  sliderCtx.fillStyle = "#666";
+  sliderCtx.textAlign = "center";
+  
+  for (let t = 0; t <= timeSpan; t += majorInterval) {
+    const x = (t / timeSpan) * width;
+    if (x < width - 30) {
+      sliderCtx.fillText(formatTime(t), x, height - 2);
+    }
+  }
+  
+  // Calculate current viewing window position
+  const windowStartX = (windowStartSec / timeSpan) * width;
+  const windowEndX = Math.min(((windowStartSec + windowSize) / timeSpan) * width, width);
+  const windowWidth = windowEndX - windowStartX;
+  
+  console.log("Window position:", { windowStartX, windowEndX, windowWidth });
+  
+  sliderCtx.fillStyle = "rgba(66, 133, 244, 0.3)";
+  sliderCtx.fillRect(windowStartX, 0, windowWidth, height);
+  
+  // Window border
+  sliderCtx.strokeStyle = "#4285f4";
+  sliderCtx.lineWidth = 2;
+  sliderCtx.strokeRect(windowStartX, 0, windowWidth, height);
+  
+  // Current position slider handle - blue triangle at start of window
+  sliderCtx.fillStyle = "#4285f4";
+  sliderCtx.strokeStyle = "#1a73e8";
+  sliderCtx.lineWidth = 2;
+  
+  // Slider handle (triangle pointing down) - positioned at window start
+  const handleSize = 10;
+  sliderCtx.beginPath();
+  sliderCtx.moveTo(windowStartX, 0);
+  sliderCtx.lineTo(windowStartX - handleSize/2, handleSize);
+  sliderCtx.lineTo(windowStartX + handleSize/2, handleSize);
+  sliderCtx.closePath();
+  sliderCtx.fill();
+  sliderCtx.stroke();
+  
+  // Vertical position line at window start
+  sliderCtx.strokeStyle = "#4285f4";
+  sliderCtx.lineWidth = 2;
+  sliderCtx.beginPath();
+  sliderCtx.moveTo(windowStartX, handleSize);
+  sliderCtx.lineTo(windowStartX, height);
+  sliderCtx.stroke();
+  
+  // If window is large enough, also show end marker
+  if (windowWidth > 20 && timeSpan > windowSize) {
+    sliderCtx.strokeStyle = "rgba(66, 133, 244, 0.8)";
+    sliderCtx.lineWidth = 2;
+    sliderCtx.beginPath();
+    sliderCtx.moveTo(windowEndX, 0);
+    sliderCtx.lineTo(windowEndX, height);
+    sliderCtx.stroke();
+  }
+}
 
-  // Reset dropdown back to label
-  e.target.selectedIndex = 0;
-});
+function onSliderMouseDown(e) {
+  dragging = true;
+  onSliderMouseMove(e);
+}
 
-
-  document
-    .getElementById("showPsdBtn")
-    .addEventListener("click", handlePsdToggle);
+function onSliderMouseMove(e) {
+  if (!dragging) return;
+  
+  const rect = timeSliderCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const percent = Math.max(0, Math.min(1, x / rect.width));
+  
+  // Calculate new window start position - allows navigation through entire recording
+  const maxStart = Math.max(0, totalDurationSec - windowSize);
+  const newWindowStart = percent * maxStart;
+  windowStartSec = Math.max(0, Math.min(maxStart, Math.round(newWindowStart * 10) / 10)); // Round to 0.1s precision
+  
+  console.log("Slider moved:", { 
+    percent: percent.toFixed(3), 
+    newWindowStart: newWindowStart.toFixed(1), 
+    windowStartSec: windowStartSec.toFixed(1),
+    maxStart: maxStart.toFixed(1),
+    totalDuration: totalDurationSec 
+  });
+  
+  drawSlider();
+  plotCurrentWindow();
 }
 
 function populateChannelList(channelNames) {
@@ -233,32 +496,15 @@ function populateChannelList(channelNames) {
   });
 }
 
-function configureSlider() {
-  const slider = document.getElementById("windowSlider");
-  const label = document.getElementById("windowTimeLabel");
-
-  slider.max = maxWindow;
-  slider.value = 0;
-  slider.disabled = false;
-  label.textContent = `0s–${windowSize}s`;
-
-  slider.addEventListener("input", () => {
-    const startSec = parseInt(slider.value);
-    label.textContent = `${startSec}s–${startSec + windowSize}s`;
-    plotCurrentWindow();
-  });
-}
-
 function plotCurrentWindow() {
   const plotDiv = document.getElementById("plot");
   plotDiv.innerHTML = "";
 
-  const slider = document.getElementById("windowSlider");
   const selectedChannels = Array.from(
     document.querySelectorAll("#channelList input:checked")
   ).map((cb) => cb.value);
 
-  const start = parseInt(slider.value) * sampleRate;
+  const start = windowStartSec * sampleRate;
   const end = start + windowSize * sampleRate;
 
   if (isStackedView) {
@@ -349,7 +595,6 @@ async function handlePsdToggle() {
     psdDiv.style.display = "block";
     psdDiv.innerHTML = `<div style="padding: 10px 20px; color: red;">Please select at least one channel to view PSD.</div>`;
 
-    // Reset state so the button works again when re-clicked
     document.getElementById("showPsdBtn").textContent = "Show PSD";
     psdVisible = false;
     return;
@@ -369,7 +614,7 @@ async function handlePsdToggle() {
 
 async function updatePSDPlot(selectedChannels) {
   const psdDiv = document.getElementById("psdPlot");
-  psdDiv.innerHTML = ""; // Clear previous content
+  psdDiv.innerHTML = "";
 
   if (!selectedChannels.length) {
     psdDiv.innerHTML = `<div style="padding: 20px; color: red;">Please select at least one channel to compute PSD.</div>`;
@@ -382,7 +627,7 @@ async function updatePSDPlot(selectedChannels) {
     );
     const selectedSignals = selectedIndices.map((i) => eegData.signals[i]);
 
-    const res = await fetch("http://localhost:5000/psd", {
+    const res = await fetch(`${FLASK_API}/psd`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
