@@ -2,8 +2,6 @@
 
 **BrainViz**  is a lightweight Chrome extension designed for researchers, students, and clinicians working with brainwave data. It enables fast and intuitive visualization of EEG signals from `.txt` and `.edf` files directly in the browser, with filtering, channel control, and PSD analysis.
 
----
-
 ## Features
 
 ### 🚀 Core EEG Viewer
@@ -30,8 +28,6 @@
 
 * **Download Detection**: Intercepts `.edf` or `.txt` EEG downloads for instant preview
 * **Storage Fallbacks**: Uses IndexedDB and Chrome storage for large file handling
-
----
 
 ## 📦 Installation
 
@@ -139,13 +135,9 @@ This server (via `mcp_server.py`) performs EEG preprocessing:
 * PSD calculation
 * Channel data extraction
 
----
-
 ## ⚠️ Known Issues
 
 - Interception may fail if page disables content scripts or uses custom download logic.
-
----
 
 ## 🧰 Troubleshooting
 
@@ -156,7 +148,6 @@ This server (via `mcp_server.py`) performs EEG preprocessing:
 | Content not displaying      | File may be HTML or invalid EEG data (check devtools/network tab)   |
 | Not working on some pages   | Some domains restrict extension scripts (e.g. chrome:// or sandboxed pages) |
 
----
 
 ## Development
 
@@ -194,5 +185,7 @@ This extension processes EEG files locally in your browser and communicates only
 ---
 
 **Version**: 1.0.0
+
 **Manifest**: v3
+
 **Minimum Chrome Version**: 88+
