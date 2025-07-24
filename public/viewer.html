@@ -152,8 +152,12 @@
   <div id="main">
     <div id="fileTitle">
       <span id="fileLabel">File: Loading...</span>
-      <button id="toggleViewBtn">Switch to Stacked View</button>
+      <div style="display: flex; gap: 8px;">
+        <button id="toggleViewBtn">Switch to Stacked View</button>
+        <button id="showPsdBtn">Show PSD</button>
+      </div>
     </div>
+
 
     <div id="plot">
       <div class="loading">🧠 Loading EEG data...</div>
@@ -190,9 +194,6 @@
       <input type="number" id="lowFreq" placeholder="Low Freq (Hz)" />
       <input type="number" id="highFreq" placeholder="High Freq (Hz)" />
       <button id="applyFilter">Apply</button>
-
-      <!-- PSD Button -->
-      <button id="showPsdBtn">Show PSD</button>
 
     </div>
 

@@ -506,28 +506,42 @@ function plotCurrentWindow() {
 }
 
 async function handlePsdToggle() {
-  const selectedChannels = getSelectedChannels();
-
+  const plotDiv = document.getElementById("plot");
   const psdDiv = document.getElementById("psdPlot");
-
-  if (!selectedChannels.length) {
-    psdDiv.style.display = "block";
-    psdDiv.innerHTML = `<div style="padding: 10px 20px; color: red;">Please select at least one channel to view PSD.</div>`;
-
-    document.getElementById("showPsdBtn").textContent = "Show PSD";
-    psdVisible = false;
-    return;
-  }
+  const timeline = document.getElementById("timelineContainer");
+  const viewToggleBtn = document.getElementById("toggleViewBtn");
+  const psdBtn = document.getElementById("showPsdBtn");
+  const bottomControls = document.getElementById("bottomControls");
+  const fileTitle = document.getElementById("fileTitle");
 
   if (!psdVisible) {
-    await updatePSDPlot(selectedChannels);
+    // Switch to PSD mode
+    plotDiv.style.display = "none";
+    timeline.style.display = "none";
+    bottomControls.style.display = "none";
+    viewToggleBtn.style.display = "none";
     psdDiv.style.display = "block";
-    document.getElementById("showPsdBtn").textContent = "Hide PSD";
+    psdBtn.textContent = "Back to EEG";
+
+    const selectedChannels = getSelectedChannels();
+    if (!selectedChannels.length) {
+      psdDiv.innerHTML = `<div style="padding: 20px; color: red;">Please select at least one channel for PSD.</div>`;
+      return;
+    }
+
+    await updatePSDPlot(selectedChannels);
     psdVisible = true;
   } else {
+    // Back to EEG mode
+    plotDiv.style.display = "block";
+    timeline.style.display = "block";
+    bottomControls.style.display = "flex";
+    viewToggleBtn.style.display = "inline-block";
+    fileTitle.style.justifyContent = "space-between";
     psdDiv.style.display = "none";
-    document.getElementById("showPsdBtn").textContent = "Show PSD";
+    psdBtn.textContent = "Show PSD";
     psdVisible = false;
+    plotCurrentWindow();
   }
 }
 
