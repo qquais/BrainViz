@@ -83,12 +83,11 @@
     }
 
     #timelineContainer {
-      background: #f8f8f8;
-      border-top: 1px solid #ddd;
-      border-bottom: 1px solid #ddd;
-      padding: 5px 15px;
-      height: 40px;
-      min-height: 40px;
+      padding: 0;
+      height: 30px;
+      background: white;
+      border-top: none;
+      border-bottom: 1px solid #ccc;
     }
 
     #eegTimeSlider {
@@ -163,8 +162,8 @@
     <div id="psdPlot"></div>
 
     <!-- Timeline Container -->
-    <div id="timelineContainer">
-      <canvas id="eegTimeSlider" width="800" height="30"></canvas>
+    <div id="timelineContainer" style="padding: 0; height: 30px;">
+      <canvas id="eegTimeSlider" width="800" height="24"></canvas>
     </div>
 
     <!-- Bottom control bar -->

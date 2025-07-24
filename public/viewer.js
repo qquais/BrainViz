@@ -322,137 +322,37 @@ function formatTime(seconds) {
 }
 
 function drawSlider() {
-  if (!timeSliderCanvas || !sliderCtx) {
-    console.error("Canvas or context not available");
-    return;
-  }
+  if (!timeSliderCanvas || !sliderCtx) return;
 
   const rect = timeSliderCanvas.getBoundingClientRect();
   const width = rect.width;
   const height = rect.height;
 
-  console.log("Drawing slider:", {
-    width,
-    height,
-    totalDurationSec,
-    windowStartSec,
-    maxWindow,
-  });
-
   sliderCtx.clearRect(0, 0, width, height);
-  sliderCtx.fillStyle = "#f8f8f8";
+  sliderCtx.fillStyle = "#ffffff";
   sliderCtx.fillRect(0, 0, width, height);
   sliderCtx.strokeStyle = "#ddd";
-  sliderCtx.lineWidth = 1;
   sliderCtx.strokeRect(0, 0, width, height);
 
-  if (totalDurationSec <= 0) {
-    console.warn("Invalid total duration:", totalDurationSec);
-    return;
-  }
+  if (totalDurationSec <= 0) return;
 
   const timeSpan = totalDurationSec;
-  let majorInterval = 10;
+  const cursorX = (windowStartSec / timeSpan) * width;
 
-  // Adjust intervals based on duration for optimal display
-  if (timeSpan > 3600)
-    majorInterval = 300; // 5 minutes for very long recordings
-  else if (timeSpan > 1800) majorInterval = 180; // 3 minutes
-  else if (timeSpan > 600) majorInterval = 60; // 1 minute
-  else if (timeSpan > 300) majorInterval = 30; // 30 seconds
-  else if (timeSpan > 120) majorInterval = 20; // 20 seconds
-  else if (timeSpan > 60) majorInterval = 10; // 10 seconds
-  else if (timeSpan > 30) majorInterval = 5; // 5 seconds
-  else majorInterval = Math.max(1, Math.ceil(timeSpan / 10)); // At least 10 divisions
+  // Only draw the vertical slider line
+  sliderCtx.beginPath();
+  sliderCtx.strokeStyle = "#888"; // grey
+  sliderCtx.lineWidth = 4;
+  sliderCtx.moveTo(cursorX, 0);
+  sliderCtx.lineTo(cursorX, height);
+  sliderCtx.stroke();
+  sliderCtx.lineWidth = 1; // reset
 
-  // Draw vertical time lines - Neurosoft style
-  sliderCtx.strokeStyle = "#ccc";
-  sliderCtx.lineWidth = 1;
-
-  for (let t = 0; t <= timeSpan; t += majorInterval) {
-    const x = (t / timeSpan) * width;
-
-    // Major vertical line
-    sliderCtx.beginPath();
-    sliderCtx.moveTo(x, 0);
-    sliderCtx.lineTo(x, height);
-    sliderCtx.stroke();
-  }
-
-  // Draw minor vertical lines for better granularity
-  sliderCtx.strokeStyle = "#e5e5e5";
-  const minorInterval = majorInterval / (majorInterval > 60 ? 4 : 2);
-  for (let t = minorInterval; t < timeSpan; t += minorInterval) {
-    if (t % majorInterval !== 0) {
-      const x = (t / timeSpan) * width;
-      sliderCtx.beginPath();
-      sliderCtx.moveTo(x, height - 8);
-      sliderCtx.lineTo(x, height);
-      sliderCtx.stroke();
-    }
-  }
-
-  sliderCtx.font = "9px Arial";
-  sliderCtx.fillStyle = "#666";
+  // Time label on top of the line
+  sliderCtx.fillStyle = "#333";
+  sliderCtx.font = "10px Arial";
   sliderCtx.textAlign = "center";
-
-  for (let t = 0; t <= timeSpan; t += majorInterval) {
-    const x = (t / timeSpan) * width;
-    if (x < width - 30) {
-      sliderCtx.fillText(formatTime(t), x, height - 2);
-    }
-  }
-
-  // Calculate current viewing window position
-  const windowStartX = (windowStartSec / timeSpan) * width;
-  const windowEndX = Math.min(
-    ((windowStartSec + windowSize) / timeSpan) * width,
-    width
-  );
-  const windowWidth = windowEndX - windowStartX;
-
-  console.log("Window position:", { windowStartX, windowEndX, windowWidth });
-
-  sliderCtx.fillStyle = "rgba(66, 133, 244, 0.3)";
-  sliderCtx.fillRect(windowStartX, 0, windowWidth, height);
-
-  // Window border
-  sliderCtx.strokeStyle = "#4285f4";
-  sliderCtx.lineWidth = 2;
-  sliderCtx.strokeRect(windowStartX, 0, windowWidth, height);
-
-  // Current position slider handle - blue triangle at start of window
-  sliderCtx.fillStyle = "#4285f4";
-  sliderCtx.strokeStyle = "#1a73e8";
-  sliderCtx.lineWidth = 2;
-
-  // Slider handle (triangle pointing down) - positioned at window start
-  const handleSize = 10;
-  sliderCtx.beginPath();
-  sliderCtx.moveTo(windowStartX, 0);
-  sliderCtx.lineTo(windowStartX - handleSize / 2, handleSize);
-  sliderCtx.lineTo(windowStartX + handleSize / 2, handleSize);
-  sliderCtx.closePath();
-  sliderCtx.fill();
-  sliderCtx.stroke();
-
-  // Vertical position line at window start
-  sliderCtx.strokeStyle = "#4285f4";
-  sliderCtx.lineWidth = 2;
-  sliderCtx.beginPath();
-  sliderCtx.moveTo(windowStartX, handleSize);
-  sliderCtx.lineTo(windowStartX, height);
-  sliderCtx.stroke();
-
-  // If window is large enough, also show end marker
-  if (windowWidth > 20 && timeSpan > windowSize) {
-    sliderCtx.strokeStyle = "rgba(66, 133, 244, 0.8)";
-    sliderCtx.lineWidth = 2;
-    sliderCtx.beginPath();
-    sliderCtx.moveTo(windowEndX, 0);
-    sliderCtx.lineTo(windowEndX, height);
-    sliderCtx.stroke();
-  }
+  sliderCtx.fillText(formatTime(windowStartSec), cursorX, 10);
 }
 
 function onSliderMouseDown(e) {
@@ -466,8 +366,6 @@ function onSliderMouseMove(e) {
   const rect = timeSliderCanvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const percent = Math.max(0, Math.min(1, x / rect.width));
-
-  // Calculate new window start position - allows navigation through entire recording
   const maxStart = Math.max(0, totalDurationSec - windowSize);
   const newWindowStart = percent * maxStart;
   windowStartSec = Math.max(
