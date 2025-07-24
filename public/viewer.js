@@ -11,7 +11,8 @@ let dragging = false;
 let windowStartSec = 0;
 let totalDurationSec = 0;
 
-const FLASK_API = "https://brainviz.opensource.mieweb.org";
+// const FLASK_API = "https://brainviz.opensource.mieweb.org";
+const FLASK_API = "http://localhost:5000";
 console.log("Using EEG API:", FLASK_API);
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -106,25 +107,28 @@ function initializeData(result) {
   windowSize = 10;
   maxWindow = Math.max(0, totalDurationSec - windowSize);
   windowStartSec = 0;
-  
+
   console.log("EEG Data initialized:", {
     totalDurationSec: totalDurationSec.toFixed(1),
     maxWindow: maxWindow.toFixed(1),
     signalLength: result.signals[0].length,
     sampleRate,
     windowSize,
-    channels: result.channel_names.length
+    channels: result.channel_names.length,
   });
-  
-  document.getElementById("fileLabel").textContent = `File: ${currentFileName} (${totalDurationSec.toFixed(0)}s)`;
+
+  document.getElementById(
+    "fileLabel"
+  ).textContent = `File: ${currentFileName} (${totalDurationSec.toFixed(0)}s)`;
   populateChannelList(result.channel_names);
-  
+
   // Initialize slider after a small delay to ensure DOM is ready
   setTimeout(() => {
     initEEGTimeSlider();
   }, 100);
-  
-  document.getElementById("toggleViewBtn").textContent = "Switch to Compact View";
+
+  document.getElementById("toggleViewBtn").textContent =
+    "Switch to Compact View";
   plotCurrentWindow();
 
   document.getElementById("toggleViewBtn").onclick = () => {
@@ -165,55 +169,59 @@ function initializeData(result) {
     }
   });
 
-  document.getElementById("rejectorSelect").addEventListener("change", async (e) => {
-    const value = e.target.value;
+  document
+    .getElementById("rejectorSelect")
+    .addEventListener("change", async (e) => {
+      const value = e.target.value;
 
-    if (value === "off") {
-      const eegStore = new EEGStorage();
-      const edfData = await eegStore.getEDFFile();
-      if (edfData?.data) {
-        await sendToFlaskAndLoadSignals(edfData.data);
-      } else {
-        const db = await eegStore.openDB();
-        const tx = db.transaction(["eegFiles"], "readonly");
-        const store = tx.objectStore("eegFiles");
-        const request = store.get("current_text");
+      if (value === "off") {
+        const eegStore = new EEGStorage();
+        const edfData = await eegStore.getEDFFile();
+        if (edfData?.data) {
+          await sendToFlaskAndLoadSignals(edfData.data);
+        } else {
+          const db = await eegStore.openDB();
+          const tx = db.transaction(["eegFiles"], "readonly");
+          const store = tx.objectStore("eegFiles");
+          const request = store.get("current_text");
 
-        const textResult = await new Promise((resolve, reject) => {
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
-        });
+          const textResult = await new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
 
-        db.close();
-        if (textResult?.data) {
-          await sendTextToFlaskAndLoadSignals(textResult.data);
+          db.close();
+          if (textResult?.data) {
+            await sendTextToFlaskAndLoadSignals(textResult.data);
+          }
+        }
+      } else if (value === "50" || value === "60") {
+        try {
+          const res = await fetch(`${FLASK_API}/filter-signal`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              signals: eegData.signals,
+              sample_rate: sampleRate,
+              filter_type: "notch",
+              l_freq: parseFloat(value),
+            }),
+          });
+
+          const result = await res.json();
+          if (result.error) throw new Error(result.error);
+
+          eegData.signals = result.filtered;
+          plotCurrentWindow();
+        } catch (err) {
+          console.error("Rejector error:", err.message);
         }
       }
-    } else if (value === "50" || value === "60") {
-      try {
-        const res = await fetch(`${FLASK_API}/filter-signal`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            signals: eegData.signals,
-            sample_rate: sampleRate,
-            filter_type: "notch",
-            l_freq: parseFloat(value),
-          }),
-        });
+    });
 
-        const result = await res.json();
-        if (result.error) throw new Error(result.error);
-
-        eegData.signals = result.filtered;
-        plotCurrentWindow();
-      } catch (err) {
-        console.error("Rejector error:", err.message);
-      }
-    }
-  });
-
-  document.getElementById("showPsdBtn").addEventListener("click", handlePsdToggle);
+  document
+    .getElementById("showPsdBtn")
+    .addEventListener("click", handlePsdToggle);
 }
 
 function initEEGTimeSlider() {
@@ -222,33 +230,33 @@ function initEEGTimeSlider() {
     console.error("Timeline canvas not found!");
     return;
   }
-  
+
   sliderCtx = timeSliderCanvas.getContext("2d");
   const container = timeSliderCanvas.parentElement;
   const containerRect = container.getBoundingClientRect();
-  timeSliderCanvas.style.width = '100%';
-  timeSliderCanvas.style.height = '30px';
+  timeSliderCanvas.style.width = "100%";
+  timeSliderCanvas.style.height = "30px";
   const rect = timeSliderCanvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
-  
+
   timeSliderCanvas.width = rect.width * dpr;
   timeSliderCanvas.height = rect.height * dpr;
-  
+
   sliderCtx.scale(dpr, dpr);
-  
+
   console.log("Canvas initialized:", {
     width: rect.width,
     height: rect.height,
-    totalDuration: totalDurationSec
+    totalDuration: totalDurationSec,
   });
-  
+
   drawSlider();
-  
+
   timeSliderCanvas.addEventListener("mousedown", onSliderMouseDown);
   window.addEventListener("mouseup", () => (dragging = false));
   window.addEventListener("mousemove", onSliderMouseMove);
   document.addEventListener("keydown", handleKeyNavigation);
-  
+
   // Handle window resize
   window.addEventListener("resize", () => {
     setTimeout(() => {
@@ -263,11 +271,11 @@ function initEEGTimeSlider() {
 
 function handleKeyNavigation(e) {
   if (!eegData) return;
-  
+
   let moved = false;
   const step = 1;
-  
-  switch(e.key) {
+
+  switch (e.key) {
     case "ArrowLeft":
       e.preventDefault();
       windowStartSec = Math.max(0, windowStartSec - step);
@@ -299,7 +307,7 @@ function handleKeyNavigation(e) {
       moved = true;
       break;
   }
-  
+
   if (moved) {
     console.log(`Keyboard navigation: moved to ${windowStartSec.toFixed(1)}s`);
     drawSlider();
@@ -310,7 +318,7 @@ function handleKeyNavigation(e) {
 function formatTime(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 function drawSlider() {
@@ -318,52 +326,59 @@ function drawSlider() {
     console.error("Canvas or context not available");
     return;
   }
-  
+
   const rect = timeSliderCanvas.getBoundingClientRect();
   const width = rect.width;
   const height = rect.height;
-  
-  console.log("Drawing slider:", { width, height, totalDurationSec, windowStartSec, maxWindow });
-  
+
+  console.log("Drawing slider:", {
+    width,
+    height,
+    totalDurationSec,
+    windowStartSec,
+    maxWindow,
+  });
+
   sliderCtx.clearRect(0, 0, width, height);
   sliderCtx.fillStyle = "#f8f8f8";
   sliderCtx.fillRect(0, 0, width, height);
   sliderCtx.strokeStyle = "#ddd";
   sliderCtx.lineWidth = 1;
   sliderCtx.strokeRect(0, 0, width, height);
-  
+
   if (totalDurationSec <= 0) {
     console.warn("Invalid total duration:", totalDurationSec);
     return;
   }
-  
+
   const timeSpan = totalDurationSec;
-  let majorInterval = 10; 
-  
+  let majorInterval = 10;
+
   // Adjust intervals based on duration for optimal display
-  if (timeSpan > 3600) majorInterval = 300; // 5 minutes for very long recordings
+  if (timeSpan > 3600)
+    majorInterval = 300; // 5 minutes for very long recordings
   else if (timeSpan > 1800) majorInterval = 180; // 3 minutes
   else if (timeSpan > 600) majorInterval = 60; // 1 minute
   else if (timeSpan > 300) majorInterval = 30; // 30 seconds
   else if (timeSpan > 120) majorInterval = 20; // 20 seconds
   else if (timeSpan > 60) majorInterval = 10; // 10 seconds
-  else if (timeSpan > 30) majorInterval = 5;  // 5 seconds
+  else if (timeSpan > 30) majorInterval = 5; // 5 seconds
   else majorInterval = Math.max(1, Math.ceil(timeSpan / 10)); // At least 10 divisions
-  
+
   // Draw vertical time lines - Neurosoft style
   sliderCtx.strokeStyle = "#ccc";
   sliderCtx.lineWidth = 1;
-  
+
   for (let t = 0; t <= timeSpan; t += majorInterval) {
     const x = (t / timeSpan) * width;
-    
+
     // Major vertical line
     sliderCtx.beginPath();
     sliderCtx.moveTo(x, 0);
     sliderCtx.lineTo(x, height);
     sliderCtx.stroke();
   }
-  
+
   // Draw minor vertical lines for better granularity
   sliderCtx.strokeStyle = "#e5e5e5";
   const minorInterval = majorInterval / (majorInterval > 60 ? 4 : 2);
@@ -376,48 +391,51 @@ function drawSlider() {
       sliderCtx.stroke();
     }
   }
-  
+
   sliderCtx.font = "9px Arial";
   sliderCtx.fillStyle = "#666";
   sliderCtx.textAlign = "center";
-  
+
   for (let t = 0; t <= timeSpan; t += majorInterval) {
     const x = (t / timeSpan) * width;
     if (x < width - 30) {
       sliderCtx.fillText(formatTime(t), x, height - 2);
     }
   }
-  
+
   // Calculate current viewing window position
   const windowStartX = (windowStartSec / timeSpan) * width;
-  const windowEndX = Math.min(((windowStartSec + windowSize) / timeSpan) * width, width);
+  const windowEndX = Math.min(
+    ((windowStartSec + windowSize) / timeSpan) * width,
+    width
+  );
   const windowWidth = windowEndX - windowStartX;
-  
+
   console.log("Window position:", { windowStartX, windowEndX, windowWidth });
-  
+
   sliderCtx.fillStyle = "rgba(66, 133, 244, 0.3)";
   sliderCtx.fillRect(windowStartX, 0, windowWidth, height);
-  
+
   // Window border
   sliderCtx.strokeStyle = "#4285f4";
   sliderCtx.lineWidth = 2;
   sliderCtx.strokeRect(windowStartX, 0, windowWidth, height);
-  
+
   // Current position slider handle - blue triangle at start of window
   sliderCtx.fillStyle = "#4285f4";
   sliderCtx.strokeStyle = "#1a73e8";
   sliderCtx.lineWidth = 2;
-  
+
   // Slider handle (triangle pointing down) - positioned at window start
   const handleSize = 10;
   sliderCtx.beginPath();
   sliderCtx.moveTo(windowStartX, 0);
-  sliderCtx.lineTo(windowStartX - handleSize/2, handleSize);
-  sliderCtx.lineTo(windowStartX + handleSize/2, handleSize);
+  sliderCtx.lineTo(windowStartX - handleSize / 2, handleSize);
+  sliderCtx.lineTo(windowStartX + handleSize / 2, handleSize);
   sliderCtx.closePath();
   sliderCtx.fill();
   sliderCtx.stroke();
-  
+
   // Vertical position line at window start
   sliderCtx.strokeStyle = "#4285f4";
   sliderCtx.lineWidth = 2;
@@ -425,7 +443,7 @@ function drawSlider() {
   sliderCtx.moveTo(windowStartX, handleSize);
   sliderCtx.lineTo(windowStartX, height);
   sliderCtx.stroke();
-  
+
   // If window is large enough, also show end marker
   if (windowWidth > 20 && timeSpan > windowSize) {
     sliderCtx.strokeStyle = "rgba(66, 133, 244, 0.8)";
@@ -444,24 +462,27 @@ function onSliderMouseDown(e) {
 
 function onSliderMouseMove(e) {
   if (!dragging) return;
-  
+
   const rect = timeSliderCanvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const percent = Math.max(0, Math.min(1, x / rect.width));
-  
+
   // Calculate new window start position - allows navigation through entire recording
   const maxStart = Math.max(0, totalDurationSec - windowSize);
   const newWindowStart = percent * maxStart;
-  windowStartSec = Math.max(0, Math.min(maxStart, Math.round(newWindowStart * 10) / 10)); // Round to 0.1s precision
-  
-  console.log("Slider moved:", { 
-    percent: percent.toFixed(3), 
-    newWindowStart: newWindowStart.toFixed(1), 
+  windowStartSec = Math.max(
+    0,
+    Math.min(maxStart, Math.round(newWindowStart * 10) / 10)
+  ); // Round to 0.1s precision
+
+  console.log("Slider moved:", {
+    percent: percent.toFixed(3),
+    newWindowStart: newWindowStart.toFixed(1),
     windowStartSec: windowStartSec.toFixed(1),
     maxStart: maxStart.toFixed(1),
-    totalDuration: totalDurationSec 
+    totalDuration: totalDurationSec,
   });
-  
+
   drawSlider();
   plotCurrentWindow();
 }
@@ -663,21 +684,15 @@ async function updatePSDPlot(selectedChannels) {
 }
 
 function setupChannelToggleButtons() {
-  const selectAllBtn = document.getElementById("selectAllBtn");
-  const unselectAllBtn = document.getElementById("unselectAllBtn");
+  const toggleAllCheckbox = document.getElementById("toggleAllCheckbox");
+  if (!toggleAllCheckbox) return;
 
-  selectAllBtn.addEventListener("click", () => {
+  toggleAllCheckbox.addEventListener("change", () => {
+    const checked = toggleAllCheckbox.checked;
     document
       .querySelectorAll("#channelList input[type='checkbox']")
-      .forEach((cb) => (cb.checked = true));
-    plotCurrentWindow();
-    if (psdVisible) updatePSDPlot(getSelectedChannels());
-  });
+      .forEach((cb) => (cb.checked = checked));
 
-  unselectAllBtn.addEventListener("click", () => {
-    document
-      .querySelectorAll("#channelList input[type='checkbox']")
-      .forEach((cb) => (cb.checked = false));
     plotCurrentWindow();
     if (psdVisible) updatePSDPlot(getSelectedChannels());
   });

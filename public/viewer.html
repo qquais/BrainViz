@@ -17,46 +17,29 @@
     }
 
     #sidebar {
-      width: 240px;
+      min-width: 140px;
+      max-width: 260px;
+      width: fit-content;
       background: #f0f4f8;
       border-right: 1px solid #ccc;
       padding: 15px;
       box-sizing: border-box;
       overflow-y: auto;
-    }
-
-    #sidebar h2 {
-      font-size: 18px;
-      margin-bottom: 10px;
-      color: #2c3e50;
-    }
-
-    #channelButtons {
-      margin-bottom: 10px;
-    }
-
-    #channelButtons button {
-      background: #2196f3;
-      color: white;
-      border: none;
-      padding: 5px 10px;
-      margin-right: 5px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-    }
-
-    #channelButtons button:hover {
-      background: #1976d2;
+      white-space: nowrap;
     }
 
     #channelList label {
-      display: block;
-      margin-bottom: 6px;
-      font-size: 14px;
+      display: flex;
+      align-items: center;
+      margin-bottom: 4px;
+      font-size: 13px;
       color: #34495e;
       cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+
 
     #channelList input[type="checkbox"] {
       margin-right: 8px;
@@ -156,11 +139,13 @@
 <body>
   <!-- Sidebar -->
   <div id="sidebar">
-    <h2>Channels</h2>
-    <div id="channelButtons">
-      <button id="selectAllBtn">Select All</button>
-      <button id="unselectAllBtn">Unselect All</button>
+    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+      <label style="font-size: 14px; font-weight: bold;">
+        <input type="checkbox" id="toggleAllCheckbox" checked style="margin-right: 6px;" />
+        Channels
+      </label>
     </div>
+
     <div id="channelList"></div>
   </div>
 
