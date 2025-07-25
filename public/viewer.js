@@ -23,7 +23,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (topoBtn) {
       topoBtn.addEventListener("click", () => fetchTopomap(10));
     }
-    
   } catch (error) {
     showError(`Initialization failed: ${error.message}`);
   }
@@ -623,7 +622,17 @@ async function fetchTopomap(freq) {
     alert("EEG data not available yet.");
     return;
   }
-  
+
+  if (
+    currentFileName.endsWith(".txt") ||
+    currentEEGBlob.type === "text/plain"
+  ) {
+    alert(
+      "Topomap requires EDF file format. Text files are not supported for topography."
+    );
+    return;
+  }
+
   try {
     const formData = new FormData();
     formData.append("file", currentEEGBlob, "eeg.edf");
@@ -641,18 +650,16 @@ async function fetchTopomap(freq) {
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
 
-    // Show image in a popup or container
     const container = document.getElementById("topomapContainer");
     const img = document.getElementById("topomapImage");
-    
+
     if (img && container) {
       img.src = url;
       container.style.display = "block";
       img.style.display = "block";
     }
-    
+
     console.log("Topomap displayed successfully");
-    
   } catch (error) {
     console.error("Topomap error:", error);
     alert(`Topomap failed: ${error.message}`);
