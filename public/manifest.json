@@ -5,9 +5,7 @@
   "description": "Read and visualize EEG signals from .txt and .edf files.",
   "permissions": [
     "storage",
-    "tabs",
     "downloads",
-    "notifications",
     "unlimitedStorage"
   ],
   "host_permissions": [
