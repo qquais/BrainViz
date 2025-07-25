@@ -10,6 +10,7 @@ let sliderCtx = null;
 let dragging = false;
 let windowStartSec = 0;
 let totalDurationSec = 0;
+let currentEEGBlob = null;
 
 // const FLASK_API = "https://brainviz.opensource.mieweb.org";
 const FLASK_API = "http://localhost:5000";
@@ -18,6 +19,11 @@ console.log("Using EEG API:", FLASK_API);
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     await initializeViewer();
+    const topoBtn = document.getElementById("topomap10HzBtn");
+    if (topoBtn) {
+      topoBtn.addEventListener("click", () => fetchTopomap(10));
+    }
+    
   } catch (error) {
     showError(`Initialization failed: ${error.message}`);
   }
@@ -63,6 +69,7 @@ async function sendToFlaskAndLoadSignals(bufferArray) {
     const blob = new Blob([new Uint8Array(bufferArray)], {
       type: "application/octet-stream",
     });
+    currentEEGBlob = blob;
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
@@ -83,6 +90,7 @@ async function sendToFlaskAndLoadSignals(bufferArray) {
 async function sendTextToFlaskAndLoadSignals(text) {
   try {
     const blob = new Blob([text], { type: "text/plain" });
+    currentEEGBlob = blob;
     const formData = new FormData();
     formData.append("file", blob, currentFileName);
 
@@ -608,6 +616,47 @@ function setupChannelToggleButtons() {
     plotCurrentWindow();
     if (psdVisible) updatePSDPlot(getSelectedChannels());
   });
+}
+
+async function fetchTopomap(freq) {
+  if (!currentEEGBlob) {
+    alert("EEG data not available yet.");
+    return;
+  }
+  
+  try {
+    const formData = new FormData();
+    formData.append("file", currentEEGBlob, "eeg.edf");
+    formData.append("freq", freq);
+
+    const response = await fetch(`${FLASK_API}/psd-topomap`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Topomap failed: ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+
+    // Show image in a popup or container
+    const container = document.getElementById("topomapContainer");
+    const img = document.getElementById("topomapImage");
+    
+    if (img && container) {
+      img.src = url;
+      container.style.display = "block";
+      img.style.display = "block";
+    }
+    
+    console.log("Topomap displayed successfully");
+    
+  } catch (error) {
+    console.error("Topomap error:", error);
+    alert(`Topomap failed: ${error.message}`);
+  }
 }
 
 function getSelectedChannels() {

@@ -170,6 +170,7 @@
       <div style="display: flex; gap: 8px;">
         <button id="toggleViewBtn">Switch to Stacked View</button>
         <button id="showPsdBtn">Show PSD</button>
+        <button id="topomap10HzBtn">Topomap @10Hz</button>
       </div>
     </div>
 
@@ -179,6 +180,11 @@
     </div>
 
     <div id="psdPlot"></div>
+
+    <div id="topomapContainer" style="display: none; text-align: center; margin-top: 20px;">
+      <img id="topomapImage" src="" alt="Topomap PSD" style="max-width: 400px; border-radius: 8px;" />
+    </div>
+
 
     <!-- Timeline Container -->
     <div id="timelineContainer" style="padding: 0; height: 30px;">
