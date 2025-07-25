@@ -245,72 +245,9 @@ def compute_psd():
         logger.exception("PSD computation failed")
         return jsonify({"error": str(e)}), 500
 
-@app.route("/debug-channels", methods=["POST"])
-def debug_channels():
-    try:
-        edf_file = request.files.get('file')
-        if not edf_file:
-            return jsonify({"error": "No file uploaded"}), 400
-
-        raw = load_edf_from_file(edf_file)
-        
-        channel_info = []
-        for i, ch in enumerate(raw.ch_names):
-            clean_ch = ch.replace(".", "").replace(" ", "").replace("-", "").upper()
-            channel_info.append({
-                "original": ch,
-                "cleaned": clean_ch,
-                "type": raw.get_channel_types()[i] if i < len(raw.get_channel_types()) else "unknown"
-            })
-        
-        # Try montage setup and see what happens
-        raw_copy = raw.copy()
-        try:
-            raw_copy.set_montage("standard_1020", on_missing="warn")
-            montage_success = True
-            
-            # Fix NaN issue by filtering out invalid positions
-            positions_3d = []
-            positions_2d = []
-            for ch in raw_copy.info['chs']:
-                pos_3d = ch['loc'][:3].tolist()
-                pos_2d = ch['loc'][:2].tolist()
-                
-                # Replace NaN with 0
-                pos_3d = [0.0 if np.isnan(x) else float(x) for x in pos_3d]
-                pos_2d = [0.0 if np.isnan(x) else float(x) for x in pos_2d]
-                
-                positions_3d.append(pos_3d)
-                positions_2d.append(pos_2d)
-            
-            # Check for duplicates
-            duplicates = []
-            for i, pos in enumerate(positions_2d):
-                for j, other_pos in enumerate(positions_2d[i+1:], i+1):
-                    if np.allclose(pos, other_pos, atol=1e-3):
-                        duplicates.append((raw_copy.ch_names[i], raw_copy.ch_names[j], pos))
-                        
-        except Exception as e:
-            montage_success = False
-            positions_3d = []
-            positions_2d = []
-            duplicates = []
-            
-        return jsonify({
-            "channels": channel_info,
-            "montage_success": montage_success,
-            "positions_3d": positions_3d,
-            "positions_2d": positions_2d,
-            "duplicates": duplicates,
-            "total_channels": len(raw.ch_names)
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 @app.route("/psd-topomap", methods=["POST"])
 def psd_topomap():
-    """Fixed implementation with 3D positions and better duplicate handling"""
+    """Robust topomap with duplicate handling"""
     try:
         edf_file = request.files.get('file')
         freq = float(request.form.get("freq", 10))
@@ -319,110 +256,105 @@ def psd_topomap():
             return jsonify({"error": "No file uploaded"}), 400
 
         raw = load_edf_from_file(edf_file)
+        logger.info(f"Original channels ({len(raw.ch_names)}): {raw.ch_names}")
         
-        # Map your actual channel names to standard names
-        channel_mapping = {}
-        for ch in raw.ch_names:
-            clean_ch = ch.replace(".", "").replace(" ", "").replace("-", "").upper()
-            # Your channels already look standard, so minimal cleaning
-            channel_mapping[ch] = clean_ch
-
-        logger.info(f"Original channels: {raw.ch_names}")
-        logger.info(f"Channel mapping: {channel_mapping}")
-
-        # Pick and rename channels
-        raw_subset = raw.copy()
-        raw_subset.rename_channels(channel_mapping)
-        
-        # Create 3D positions for standard 10-20 electrodes (X, Y, Z coordinates)
-        # These are approximate positions on a unit sphere
-        standard_positions_3d = {
-            'FP1': [-0.06, 0.08, 0.05], 'FP2': [0.06, 0.08, 0.05],
-            'F7': [-0.08, 0.03, 0.02], 'F3': [-0.05, 0.05, 0.04], 
-            'FZ': [0.0, 0.05, 0.06], 'F4': [0.05, 0.05, 0.04], 'F8': [0.08, 0.03, 0.02],
-            'FC5': [-0.07, 0.02, 0.03], 'FC1': [-0.03, 0.02, 0.05], 'FC2': [0.03, 0.02, 0.05], 'FC6': [0.07, 0.02, 0.03],
-            'T7': [-0.08, 0.0, 0.0], 'C3': [-0.05, 0.0, 0.04], 'CZ': [0.0, 0.0, 0.06], 
-            'C4': [0.05, 0.0, 0.04], 'T8': [0.08, 0.0, 0.0],
-            'CP5': [-0.07, -0.02, 0.03], 'CP1': [-0.03, -0.02, 0.05], 'CP2': [0.03, -0.02, 0.05], 'CP6': [0.07, -0.02, 0.03],
-            'P7': [-0.08, -0.03, 0.02], 'P3': [-0.05, -0.05, 0.04], 'PZ': [0.0, -0.05, 0.06], 
-            'P4': [0.05, -0.05, 0.04], 'P8': [0.08, -0.03, 0.02],
-            'O1': [-0.03, -0.08, 0.02], 'OZ': [0.0, -0.08, 0.04], 'O2': [0.03, -0.08, 0.02],
-            
-            # Add some common variants
-            'FCZ': [0.0, 0.02, 0.06], 'CPZ': [0.0, -0.02, 0.06],
-            'AFZ': [0.0, 0.07, 0.05], 'POZ': [0.0, -0.07, 0.05],
-            'C1': [-0.025, 0.0, 0.05], 'C2': [0.025, 0.0, 0.05],
-            'C5': [-0.07, 0.0, 0.02], 'C6': [0.07, 0.0, 0.02]
+        # Comprehensive electrode positions
+        electrode_positions = {
+            'FP1': [-0.06, 0.08, 0.05], 'FP2': [0.06, 0.08, 0.05], 'FPZ': [0.0, 0.08, 0.05],
+            'AF3': [-0.04, 0.07, 0.05], 'AF4': [0.04, 0.07, 0.05], 'AFZ': [0.0, 0.07, 0.05],
+            'F7': [-0.08, 0.03, 0.02], 'F3': [-0.05, 0.05, 0.04], 'FZ': [0.0, 0.05, 0.06],
+            'F4': [0.05, 0.05, 0.04], 'F8': [0.08, 0.03, 0.02],
+            'FC5': [-0.07, 0.02, 0.03], 'FC3': [-0.04, 0.03, 0.05], 'FC1': [-0.03, 0.02, 0.05],
+            'FCZ': [0.0, 0.02, 0.06], 'FC2': [0.03, 0.02, 0.05], 'FC4': [0.04, 0.03, 0.05], 'FC6': [0.07, 0.02, 0.03],
+            'T7': [-0.08, 0.0, 0.0], 'C5': [-0.07, 0.0, 0.02], 'C3': [-0.05, 0.0, 0.04], 'C1': [-0.025, 0.0, 0.05],
+            'CZ': [0.0, 0.0, 0.06], 'C2': [0.025, 0.0, 0.05], 'C4': [0.05, 0.0, 0.04], 'C6': [0.07, 0.0, 0.02], 'T8': [0.08, 0.0, 0.0],
+            'CP5': [-0.07, -0.02, 0.03], 'CP3': [-0.04, -0.03, 0.05], 'CP1': [-0.03, -0.02, 0.05],
+            'CPZ': [0.0, -0.02, 0.06], 'CP2': [0.03, -0.02, 0.05], 'CP4': [0.04, -0.03, 0.05], 'CP6': [0.07, -0.02, 0.03],
+            'P7': [-0.08, -0.03, 0.02], 'P5': [-0.06, -0.04, 0.03], 'P3': [-0.05, -0.05, 0.04], 'P1': [-0.03, -0.06, 0.05],
+            'PZ': [0.0, -0.05, 0.06], 'P2': [0.03, -0.06, 0.05], 'P4': [0.05, -0.05, 0.04], 'P6': [0.06, -0.04, 0.03], 'P8': [0.08, -0.03, 0.02],
+            'PO7': [-0.06, -0.06, 0.02], 'PO3': [-0.04, -0.07, 0.03], 'POZ': [0.0, -0.07, 0.05], 'PO4': [0.04, -0.07, 0.03], 'PO8': [0.06, -0.06, 0.02],
+            'O1': [-0.03, -0.08, 0.02], 'OZ': [0.0, -0.08, 0.04], 'O2': [0.03, -0.08, 0.02], 'IZ': [0.0, -0.09, 0.01],
+            'T3': [-0.08, 0.0, 0.0], 'T4': [0.08, 0.0, 0.0], 'T5': [-0.08, -0.03, 0.02], 'T6': [0.08, -0.03, 0.02],
+            'FT7': [-0.08, 0.02, 0.01], 'FT8': [0.08, 0.02, 0.01], 'FT9': [-0.09, 0.01, 0.01], 'FT10': [0.09, 0.01, 0.01],
+            'TP7': [-0.08, -0.02, 0.01], 'TP8': [0.08, -0.02, 0.01],
         }
         
-        # Only use channels that we have positions for AND exist in the data
-        final_channels = []
+        def clean_channel_name(ch_name):
+            ch = str(ch_name).upper()
+            ch = ch.replace("EEG ", "").replace("REF", "").replace(".", "").replace(" ", "").replace("-", "")
+            ch = ch.replace("_", "").replace("CH", "").replace("CHANNEL", "")
+            return ch
+        
+        # Ensure unique mapping
+        channel_mapping = {}
+        used_names = set()
+        
+        for ch in raw.ch_names:
+            # Clean the channel name
+            clean_ch = clean_channel_name(ch)
+            
+            # Find best match in electrode positions
+            best_match = None
+            
+            # Direct match
+            if clean_ch in electrode_positions and clean_ch not in used_names:
+                best_match = clean_ch
+            else:
+                # Try partial matches (for differential montage)
+                if '-' in ch:
+                    # For differential, take first electrode
+                    first_part = clean_channel_name(ch.split('-')[0])
+                    if first_part in electrode_positions and first_part not in used_names:
+                        best_match = first_part
+                
+                # Fuzzy matching
+                if not best_match:
+                    for standard_name in electrode_positions.keys():
+                        if standard_name not in used_names:
+                            if (clean_ch in standard_name or standard_name in clean_ch or
+                                clean_ch.replace('Z', '') == standard_name.replace('Z', '')):
+                                best_match = standard_name
+                                break
+            
+            if best_match:
+                channel_mapping[ch] = best_match
+                used_names.add(best_match)
+        
+        logger.info(f"Channel mapping: {channel_mapping}")
+        logger.info(f"Found {len(channel_mapping)} unique electrode matches")
+        
+        if len(channel_mapping) < 3:
+            return jsonify({"error": f"Not enough mappable channels ({len(channel_mapping)} found)"}), 400
+        
+        # Pick only channels we can map
+        channels_to_pick = list(channel_mapping.keys())
+        raw_subset = raw.copy().pick(channels_to_pick)
+        raw_subset.rename_channels(channel_mapping)
+        
+        # Get positions
         final_positions = {}
+        for new_name in raw_subset.ch_names:
+            if new_name in electrode_positions:
+                final_positions[new_name] = electrode_positions[new_name]
         
-        for ch in raw_subset.ch_names:
-            if ch in standard_positions_3d:
-                final_channels.append(ch)
-                final_positions[ch] = standard_positions_3d[ch]
+        logger.info(f"Final channels with positions: {list(final_positions.keys())}")
         
-        logger.info(f"Final channels with positions: {final_channels}")
+        # Create montage and compute PSD (rest same as before)
+        custom_montage = mne.channels.make_dig_montage(ch_pos=final_positions, coord_frame='head')
+        raw_subset.set_montage(custom_montage)
         
-        if len(final_channels) < 4:
-            return jsonify({"error": f"Not enough positionable channels (only {len(final_channels)} found)"}), 400
-        
-        # Pick final channels and set custom 3D montage
-        raw_final = raw_subset.copy().pick(final_channels)
-        
-        # Create montage with 3D positions
-        custom_montage = mne.channels.make_dig_montage(
-            ch_pos=final_positions, 
-            coord_frame='head'
-        )
-        raw_final.set_montage(custom_montage)
-        
-        # Compute PSD
-        psd = raw_final.compute_psd(
-            method='welch',
-            fmin=1, 
-            fmax=40, 
-            tmax=10.0,
-            verbose=False
-        )
+        psd = raw_subset.compute_psd(method='welch', fmin=1, fmax=40, tmax=min(10.0, raw_subset.times[-1]), verbose=False)
         psds, freqs = psd.get_data(return_freqs=True)
-        
-        # Get data for the target frequency
         freq_idx = np.abs(freqs - freq).argmin()
         topo_data = psds[:, freq_idx]
         
-        logger.info(f"PSD shape: {psds.shape}, topo_data shape: {topo_data.shape}")
-        
-        # Plot with better error handling
+        # Plot
         fig, ax = plt.subplots(figsize=(10, 8))
+        im, _ = mne.viz.plot_topomap(topo_data, raw_subset.info, axes=ax, show=False, cmap="RdBu_r", contours=6, outlines='head', sphere='auto', image_interp='cubic')
+        cbar = plt.colorbar(im, ax=ax, shrink=0.6, aspect=20)
+        cbar.set_label('Power (µV²/Hz)', rotation=270, labelpad=20)
+        ax.set_title(f'PSD Topography at {freq} Hz\n({len(final_positions)} electrodes)', fontsize=14, pad=20)
         
-        try:
-            im, _ = mne.viz.plot_topomap(
-                topo_data,
-                raw_final.info,
-                axes=ax,
-                show=False,
-                cmap="RdBu_r",
-                contours=6,
-                outlines='head',
-                sphere='auto',  # Let MNE auto-detect sphere
-                image_interp='cubic'
-            )
-            
-            # Add colorbar and title
-            cbar = plt.colorbar(im, ax=ax, shrink=0.6, aspect=20)
-            cbar.set_label('Power (µV²/Hz)', rotation=270, labelpad=20)
-            ax.set_title(f'PSD Topography at {freq} Hz\n({len(final_channels)} channels)', 
-                        fontsize=16, pad=20)
-            
-        except Exception as plot_error:
-            logger.error(f"Topography plotting error: {plot_error}")
-            plt.close(fig)
-            return jsonify({"error": f"Plotting failed: {str(plot_error)}"}), 500
-        
-        # Save to buffer
         buf = io.BytesIO()
         fig.savefig(buf, format="png", bbox_inches="tight", dpi=150)
         buf.seek(0)
