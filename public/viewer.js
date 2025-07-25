@@ -520,6 +520,8 @@ async function handlePsdToggle() {
   const psdBtn = document.getElementById("showPsdBtn");
   const bottomControls = document.getElementById("bottomControls");
   const fileTitle = document.getElementById("fileTitle");
+  const topoBtn = document.getElementById("topomap10HzBtn");
+  const topomapContainer = document.getElementById("topomapContainer");
 
   if (!psdVisible) {
     // Switch to PSD mode
@@ -527,6 +529,7 @@ async function handlePsdToggle() {
     timeline.style.display = "none";
     bottomControls.style.display = "none";
     viewToggleBtn.style.display = "none";
+    topoBtn.style.display = "inline-block"; //  topomap button
     psdDiv.style.display = "block";
     psdBtn.textContent = "Back to EEG";
 
@@ -544,6 +547,8 @@ async function handlePsdToggle() {
     timeline.style.display = "block";
     bottomControls.style.display = "flex";
     viewToggleBtn.style.display = "inline-block";
+    topoBtn.style.display = "none"; // HIDE topomap button
+    topomapContainer.style.display = "none"; // HIDE topography image
     fileTitle.style.justifyContent = "space-between";
     psdDiv.style.display = "none";
     psdBtn.textContent = "Show PSD";
