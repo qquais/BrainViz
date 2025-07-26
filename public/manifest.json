@@ -5,13 +5,12 @@
   "description": "Read and visualize EEG signals from .txt and .edf files.",
   "permissions": [
     "storage",
-    "tabs",
     "downloads",
-    "notifications",
     "unlimitedStorage"
   ],
   "host_permissions": [
-    "https://brainviz.opensource.mieweb.org/*"
+    "https://brainviz.opensource.mieweb.org/*",
+    "http://localhost:5000/*"
   ],
   "background": {
     "service_worker": "background.js"

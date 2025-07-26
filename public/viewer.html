@@ -17,46 +17,29 @@
     }
 
     #sidebar {
-      width: 240px;
+      min-width: 140px;
+      max-width: 260px;
+      width: fit-content;
       background: #f0f4f8;
       border-right: 1px solid #ccc;
       padding: 15px;
       box-sizing: border-box;
       overflow-y: auto;
-    }
-
-    #sidebar h2 {
-      font-size: 18px;
-      margin-bottom: 10px;
-      color: #2c3e50;
-    }
-
-    #channelButtons {
-      margin-bottom: 10px;
-    }
-
-    #channelButtons button {
-      background: #2196f3;
-      color: white;
-      border: none;
-      padding: 5px 10px;
-      margin-right: 5px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-    }
-
-    #channelButtons button:hover {
-      background: #1976d2;
+      white-space: nowrap;
     }
 
     #channelList label {
-      display: block;
-      margin-bottom: 6px;
-      font-size: 14px;
+      display: flex;
+      align-items: center;
+      margin-bottom: 4px;
+      font-size: 13px;
       color: #34495e;
       cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+
 
     #channelList input[type="checkbox"] {
       margin-right: 8px;
@@ -92,6 +75,21 @@
       cursor: pointer;
     }
 
+    #showPsdBtn {
+      background: #4caf50;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    #toggleViewBtn:hover,
+    #showPsdBtn:hover {
+      opacity: 0.9;
+    }
+
+
     #plot {
       flex: 1;
       background: white;
@@ -100,12 +98,11 @@
     }
 
     #timelineContainer {
-      background: #f8f8f8;
-      border-top: 1px solid #ddd;
-      border-bottom: 1px solid #ddd;
-      padding: 5px 15px;
-      height: 40px;
-      min-height: 40px;
+      padding: 0;
+      height: 30px;
+      background: white;
+      border-top: none;
+      border-bottom: 1px solid #ccc;
     }
 
     #eegTimeSlider {
@@ -156,11 +153,13 @@
 <body>
   <!-- Sidebar -->
   <div id="sidebar">
-    <h2>Channels</h2>
-    <div id="channelButtons">
-      <button id="selectAllBtn">Select All</button>
-      <button id="unselectAllBtn">Unselect All</button>
+    <div style="display: flex; align-items: center; margin-bottom: 10px;">
+      <label style="font-size: 14px; font-weight: bold;">
+        <input type="checkbox" id="toggleAllCheckbox" checked style="margin-right: 6px;" />
+        Channels
+      </label>
     </div>
+
     <div id="channelList"></div>
   </div>
 
@@ -168,8 +167,13 @@
   <div id="main">
     <div id="fileTitle">
       <span id="fileLabel">File: Loading...</span>
-      <button id="toggleViewBtn">Switch to Stacked View</button>
+      <div style="display: flex; gap: 8px;">
+        <button id="toggleViewBtn">Switch to Stacked View</button>
+        <button id="showPsdBtn">Show PSD</button>
+        <button id="topomap10HzBtn" style="display: none;">Topomap @10Hz</button>
+      </div>
     </div>
+
 
     <div id="plot">
       <div class="loading">🧠 Loading EEG data...</div>
@@ -177,9 +181,14 @@
 
     <div id="psdPlot"></div>
 
+    <div id="topomapContainer" style="display: none; text-align: center; margin-top: 20px;">
+      <img id="topomapImage" src="" alt="Topomap PSD" style="max-width: 400px; border-radius: 8px;" />
+    </div>
+
+
     <!-- Timeline Container -->
-    <div id="timelineContainer">
-      <canvas id="eegTimeSlider" width="800" height="30"></canvas>
+    <div id="timelineContainer" style="padding: 0; height: 30px;">
+      <canvas id="eegTimeSlider" width="800" height="24"></canvas>
     </div>
 
     <!-- Bottom control bar -->
@@ -206,9 +215,6 @@
       <input type="number" id="lowFreq" placeholder="Low Freq (Hz)" />
       <input type="number" id="highFreq" placeholder="High Freq (Hz)" />
       <button id="applyFilter">Apply</button>
-
-      <!-- PSD Button -->
-      <button id="showPsdBtn">Show PSD</button>
 
     </div>
 
