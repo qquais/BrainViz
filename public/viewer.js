@@ -12,8 +12,8 @@ let windowStartSec = 0;
 let totalDurationSec = 0;
 let currentEEGBlob = null;
 
-// const FLASK_API = "https://brainviz.opensource.mieweb.org";
-const FLASK_API = "http://localhost:5000";
+const FLASK_API = "https://brainviz.opensource.mieweb.org";
+// const FLASK_API = "http://localhost:5000";
 console.log("Using EEG API:", FLASK_API);
 
 document.addEventListener("DOMContentLoaded", async () => {

@@ -174,15 +174,19 @@ This extension processes EEG files locally in your browser and communicates only
 
 ## Support & Contributions
 
-* Report issues via [GitHub Issues](https://github.com/mieweb/brainviz/issues)
+* Report issues via [GitHub Issues](https://github.com/qquais/brainviz/issues)
 * For feature requests or academic collaboration, contact: [support@mieweb.org](mailto:support@mieweb.org)
 
 ## Acknowledgments
 
-* Built by [MIE](https://mieweb.org/)
+* Supported by [MIE](https://mieweb.org/)
 * Uses [MNE-Python](https://mne.tools/stable/index.html) (via backend)
 * EEG dataset support tested on [PhysioNet](https://physionet.org/)
 * Powered by [Plotly.js](https://plotly.com/javascript/)
+
+## Project Demo
+
+[Link](https://www.youtube.com/shorts/jqH67MbXUoo)
 
 ---
 
