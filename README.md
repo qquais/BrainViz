@@ -186,7 +186,7 @@ This extension processes EEG files locally in your browser and communicates only
 
 ## Project Demo
 
-[Link](https://www.youtube.com/shorts/jqH67MbXUoo)
+* [Link](https://www.youtube.com/shorts/jqH67MbXUoo)
 
 ---
 
