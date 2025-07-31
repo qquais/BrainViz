@@ -19,9 +19,9 @@ console.log("Using EEG API:", FLASK_API);
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     await initializeViewer();
-    const topoBtn = document.getElementById("topomap10HzBtn");
-    if (topoBtn) {
-      topoBtn.addEventListener("click", () => fetchTopomap(10));
+    const multiTopoBtn = document.getElementById("topomapMultiBtn");
+    if (multiTopoBtn) {
+      multiTopoBtn.addEventListener("click", showBandTopomaps);
     }
   } catch (error) {
     showError(`Initialization failed: ${error.message}`);
@@ -520,8 +520,7 @@ async function handlePsdToggle() {
   const psdBtn = document.getElementById("showPsdBtn");
   const bottomControls = document.getElementById("bottomControls");
   const fileTitle = document.getElementById("fileTitle");
-  const topoBtn = document.getElementById("topomap10HzBtn");
-  const topomapContainer = document.getElementById("topomapContainer");
+  const multiTopoBtn = document.getElementById("topomapMultiBtn");
 
   if (!psdVisible) {
     // Switch to PSD mode
@@ -529,7 +528,7 @@ async function handlePsdToggle() {
     timeline.style.display = "none";
     bottomControls.style.display = "none";
     viewToggleBtn.style.display = "none";
-    topoBtn.style.display = "inline-block"; //  topomap button
+    multiTopoBtn.style.display = "inline-block";
     psdDiv.style.display = "block";
     psdBtn.textContent = "Back to EEG";
 
@@ -547,13 +546,19 @@ async function handlePsdToggle() {
     timeline.style.display = "block";
     bottomControls.style.display = "flex";
     viewToggleBtn.style.display = "inline-block";
-    topoBtn.style.display = "none"; // HIDE topomap button
-    topomapContainer.style.display = "none"; // HIDE topography image
-    fileTitle.style.justifyContent = "space-between";
     psdDiv.style.display = "none";
     psdBtn.textContent = "Show PSD";
     psdVisible = false;
     plotCurrentWindow();
+
+    // hide topomap containers
+    if (multiTopoBtn) multiTopoBtn.style.display = "none";
+    const topomapContainer = document.getElementById("topomapContainer");
+    if (topomapContainer) topomapContainer.style.display = "none";
+    const bandTopo = document.getElementById("multiTopomapContainer");
+    if (bandTopo) bandTopo.style.display = "none";
+
+    fileTitle.style.justifyContent = "space-between";
   }
 }
 
@@ -668,6 +673,77 @@ async function fetchTopomap(freq) {
   } catch (error) {
     console.error("Topomap error:", error);
     alert(`Topomap failed: ${error.message}`);
+  }
+}
+
+async function showBandTopomaps() {
+  if (!currentEEGBlob) {
+    alert("EEG data not available yet.");
+    return;
+  }
+
+  if (
+    currentFileName.endsWith(".txt") ||
+    currentEEGBlob.type === "text/plain"
+  ) {
+    alert(
+      "Topomap requires EDF file format. Text files are not supported for topography."
+    );
+    return;
+  }
+
+  const freqBands = [
+    { name: "Delta", freq: 2 },
+    { name: "Theta", freq: 6 },
+    { name: "Alpha", freq: 10 },
+    { name: "Beta", freq: 20 },
+    { name: "Gamma", freq: 40 },
+  ];
+
+  const container = document.getElementById("multiTopomapContainer");
+  container.innerHTML = "";
+  container.style.display = "block";
+
+  for (const band of freqBands) {
+    const formData = new FormData();
+    formData.append("file", currentEEGBlob, "eeg.edf");
+    formData.append("freq", band.freq);
+
+    try {
+      const res = await fetch(`${FLASK_API}/psd-topomap`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error(`${band.name} fetch failed`);
+
+      const blob = await res.blob();
+      const imgUrl = URL.createObjectURL(blob);
+
+      const wrapper = document.createElement("div");
+      wrapper.style.display = "inline-block";
+      wrapper.style.verticalAlign = "top";
+      wrapper.style.marginRight = "20px";
+      wrapper.style.textAlign = "center";
+
+      const label = document.createElement("div");
+      label.textContent = `${band.name} (${band.freq} Hz)`;
+      label.style.fontSize = "14px";
+      label.style.marginBottom = "4px";
+
+      const img = document.createElement("img");
+      img.src = imgUrl;
+      img.alt = band.name;
+      img.style.maxWidth = "160px";
+      img.style.borderRadius = "8px";
+      img.style.display = "block";
+
+      wrapper.appendChild(label);
+      wrapper.appendChild(img);
+      container.appendChild(wrapper);
+    } catch (err) {
+      console.error(`Topomap error for ${band.name}:`, err);
+    }
   }
 }
 
