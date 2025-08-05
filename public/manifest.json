@@ -28,6 +28,7 @@
       "resources": [
         "libs/plotly.min.js",
         "libs/EdfDecoder.js",
+        "libs/jsEDF.js",
         "libs/pyodide.js",
         "libs/pyodide.asm.wasm",
         "libs/python_stdlib.zip",

@@ -11,20 +11,180 @@ let dragging = false;
 let windowStartSec = 0;
 let totalDurationSec = 0;
 
-// Patch for some versions/naming
-if (window.edfdecoder && window.edfdecoder.EDFDecoder) {
-  window.EDFDecoder = window.edfdecoder.EDFDecoder;
+/**
+ * Show errors to user.
+ */
+function showError(msg) {
+    let errorDiv = document.getElementById("errorMsg");
+    if (!errorDiv) {
+        errorDiv = document.createElement("div");
+        errorDiv.id = "errorMsg";
+        errorDiv.style = "color:red; padding:1em;";
+        document.body.prepend(errorDiv);
+    }
+    errorDiv.innerHTML = msg;
 }
 
-// Pyodide setup for filtering and PSD
+/**
+ * Initialization logic — main entry point
+ */
+document.addEventListener("DOMContentLoaded", async () => {
+    try {
+        await initializeViewer();
+        const multiTopoBtn = document.getElementById("topomapMultiBtn");
+        if (multiTopoBtn) {
+            multiTopoBtn.disabled = true;
+            multiTopoBtn.title = "Topomap only in server mode";
+        }
+    } catch (error) {
+        showError(`Initialization failed: ${error.message}`);
+    }
+});
+
+async function initializeViewer() {
+    if (typeof Plotly === "undefined") throw new Error("Plotly.js not loaded");
+    const eegStore = new EEGStorage();
+
+    // --- EDF/BDF first using jsEDF.js ---
+    const edfDataRec = await eegStore.getEDFFile();
+    if (edfDataRec && edfDataRec.data) {
+        try {
+            const buffer = edfDataRec.data instanceof ArrayBuffer ? edfDataRec.data : new Uint8Array(edfDataRec.data).buffer;
+            if (window.EDF) {
+                const edf = new window.EDF(new Uint8Array(buffer));
+                const labels = [];
+                for (let i = 0; i < edf.realChannelCount; i++) {
+                    labels.push(edf.channels[i].label);
+                }
+                // Use the raw .data arrays for full signals
+                const signals = [];
+                for (let i = 0; i < edf.realChannelCount; i++) {
+                    signals.push(edf.channels[i].data);
+                }
+                const sampleRate_local = edf.sampling_rate || (edf.channels[0].num_samples / edf.duration);
+                currentFileName = edfDataRec.filename || "Unknown File";
+                totalDurationSec = Math.floor(signals[0].length / sampleRate_local);
+
+                eegData = {
+                    channel_names: labels,
+                    sample_rate: sampleRate_local,
+                    signals: signals,
+                };
+
+                sampleRate = sampleRate_local;
+                windowSize = 10;
+                maxWindow = Math.max(0, totalDurationSec - windowSize);
+                windowStartSec = 0;
+
+                updateUIAfterFileLoad(labels, totalDurationSec);
+
+                document.getElementById("toggleViewBtn").onclick = () => {
+                    isStackedView = !isStackedView;
+                    document.getElementById("toggleViewBtn").textContent = isStackedView ? "Switch to Compact View" : "Switch to Stacked View";
+                    plotCurrentWindow();
+                };
+                document.getElementById("applyFilter").addEventListener("click", async () => {
+                    await filterInBrowser();
+                });
+                document.getElementById("showPsdBtn").addEventListener("click", handlePsdToggle);
+                return;
+            } else {
+                showError("jsEDF library not loaded.");
+                return;
+            }
+        } catch (e) {
+            showError("Failed to parse EDF/BDF in browser: " + e.message);
+            return;
+        }
+    }
+
+    // --- Try TXT fallback ---
+    try {
+        const db = await eegStore.openDB();
+        const tx = db.transaction(["eegFiles"], "readonly");
+        const store = tx.objectStore("eegFiles");
+        const request = store.get("current_text");
+        const textResult = await new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+        db.close();
+        if (textResult && textResult.data) {
+            currentFileName = textResult.filename || "Unknown File";
+            const parsed = parseTxtEEG(textResult.data);
+            eegData = parsed;
+            sampleRate = parsed.sample_rate;
+            totalDurationSec = Math.floor(parsed.signals[0].length / sampleRate);
+            windowSize = 10;
+            maxWindow = Math.max(0, totalDurationSec - windowSize);
+            windowStartSec = 0;
+            updateUIAfterFileLoad(parsed.channel_names, totalDurationSec);
+            document.getElementById("toggleViewBtn").onclick = () => {
+                isStackedView = !isStackedView;
+                document.getElementById("toggleViewBtn").textContent = isStackedView ? "Switch to Compact View" : "Switch to Stacked View";
+                plotCurrentWindow();
+            };
+            document.getElementById("applyFilter").addEventListener("click", async () => {
+                await filterInBrowser();
+            });
+            document.getElementById("showPsdBtn").addEventListener("click", handlePsdToggle);
+            return;
+        } else {
+            showError("No EEG data found in IndexedDB.");
+        }
+    } catch (e) {
+        showError("No EEG data found in IndexedDB.");
+        return;
+    }
+}
+
+function updateUIAfterFileLoad(channelNames, totalDurationSec) {
+    document.getElementById("fileLabel").textContent = `File: ${currentFileName} (${totalDurationSec.toFixed(0)}s)`;
+    populateChannelList(channelNames);
+    setTimeout(() => {
+        initEEGTimeSlider();
+    }, 100);
+    document.getElementById("toggleViewBtn").textContent = "Switch to Compact View";
+    plotCurrentWindow();
+}
+
+function parseTxtEEG(text) {
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) throw new Error("Not enough data lines");
+    let delimiter = ",";
+    if (lines[0].split("\t").length > lines[0].split(",").length) delimiter = "\t";
+    const headers = lines[0].split(delimiter).map((h) => h.trim());
+    const numChannels = headers.length;
+    const dataRows = lines
+        .slice(1)
+        .map((l) => l.split(delimiter).map(Number))
+        .filter((row) => row.length === numChannels && row.every((v) => !isNaN(v)));
+    let sampleRate_local = 256;
+    for (const l of lines) {
+        if (/sampling[\s_]?rate/i.test(l)) {
+            const m = l.match(/\d+/);
+            if (m) sampleRate_local = parseInt(m[0]);
+        }
+    }
+    let channel_names = headers.every((h) => isNaN(Number(h))) ? headers : headers.map((_, i) => `Ch${i + 1}`);
+    const signals = channel_names.map((_, i) => dataRows.map((row) => row[i]));
+    return {
+        channel_names,
+        sample_rate: sampleRate_local,
+        signals,
+    };
+}
+
+// --- Filtering and PSD in pyodide ---
 let pyodide = null;
 let pythonReady = false;
 async function setupPyodideAndFilters() {
-  pyodide = await loadPyodide({ indexURL: "libs/" });
-  await pyodide.loadPackage(["numpy", "scipy"]);
-  await pyodide.runPythonAsync(`
+    pyodide = await loadPyodide({ indexURL: "libs/" });
+    await pyodide.loadPackage(["numpy", "scipy"]);
+    await pyodide.runPythonAsync(`
 import numpy as np
 from scipy.signal import butter, filtfilt, iirnotch, welch
+
 def apply_filter(signals, fs, filter_type, l_freq, h_freq):
     filtered = []
     for sig in signals:
@@ -41,6 +201,7 @@ def apply_filter(signals, fs, filter_type, l_freq, h_freq):
             continue
         filtered.append(filtfilt(b, a, sig))
     return filtered
+
 def compute_psd(signals, fs):
     freqs_list = []
     psd_list = []
@@ -49,299 +210,51 @@ def compute_psd(signals, fs):
         freqs_list.append(freqs)
         psd_list.append(psd)
     return freqs_list, psd_list
-  `);
-  pythonReady = true;
+    `);
+    pythonReady = true;
 }
 setupPyodideAndFilters();
 
-document.addEventListener("DOMContentLoaded", async () => {
-  try {
-    await initializeViewer();
-    const multiTopoBtn = document.getElementById("topomapMultiBtn");
-    if (multiTopoBtn) {
-      multiTopoBtn.disabled = true;
-      multiTopoBtn.title = "Topomap only in server mode";
-    }
-  } catch (error) {
-    showError(`Initialization failed: ${error.message}`);
-  }
-});
-
-async function initializeViewer() {
-  if (typeof Plotly === "undefined") throw new Error("Plotly.js not loaded");
-  const eegStore = new EEGStorage();
-
-  // Try EDF first
-  const edfData = await eegStore.getEDFFile();
-  if (edfData?.data) {
-    try {
-      currentFileName = edfData.filename || "Unknown File";
-      const buffer =
-        edfData.data instanceof ArrayBuffer
-          ? edfData.data
-          : new Uint8Array(edfData.data).buffer;
-      const decoder = new window.edfdecoder.EdfDecoder();
-      decoder.setInput(buffer);
-      decoder.decode();
-      const edfObject = decoder.getOutput();
-
-      // Use physical samples if at all possible
-      let signals;
-      if (typeof decoder.getPhysicalSamples === "function") {
-        signals = decoder.getPhysicalSamples();
-      } else if (edfObject._physicalSignals) {
-        signals = edfObject._physicalSignals;
-      } else if (edfObject.physicalSignals) {
-        signals = edfObject.physicalSignals;
-      } else if (typeof decoder.getDigitalSamples === "function") {
-        signals = decoder.getDigitalSamples();
-        alert("WARNING: Showing digital values, not physical units!");
-      } else {
-        signals = edfObject._rawSignals;
-        alert("WARNING: Showing digital values, not physical units!");
-      }
-
-      const numChannels = Array.isArray(signals) ? signals.length : 0;
-      const numSamples = (numChannels > 0 && Array.isArray(signals[0])) ? signals[0].length : 0;
-
-      // Get sample rate
-      let sampleRate_local = null;
-      for (const key in edfObject.header) {
-        if (
-          key &&
-          typeof edfObject.header[key] === "number" &&
-          (key.toLowerCase().includes("samplerate") ||
-            key.toLowerCase().includes("sample_rate") ||
-            key.toLowerCase().includes("samplingrate") ||
-            key.toLowerCase().includes("fs") ||
-            key.toLowerCase().includes("frequency"))
-        ) {
-          sampleRate_local = Number(edfObject.header[key]);
-          break;
-        }
-      }
-      if (!sampleRate_local && edfObject.header?.sample_frequency)
-        sampleRate_local = Number(edfObject.header.sample_frequency);
-      if (!sampleRate_local) {
-        sampleRate_local = Number(
-          prompt(
-            "Sample rate not found in this EDF file. Please enter the sample rate (Hz) for your data.",
-            "256"
-          )
-        );
-        if (isNaN(sampleRate_local) || sampleRate_local <= 0) {
-          showError("Valid sample rate required to load EDF data.");
-          return;
-        }
-      }
-      totalDurationSec = Math.floor(numSamples / sampleRate_local);
-
-      // --- NEW: Robust channel name extraction ---
-      let channelNames = [];
-      if (typeof decoder.getSignalLabels === "function") {
-        const slabels = decoder.getSignalLabels();
-        if (slabels && Array.isArray(slabels) && slabels.length === numChannels) {
-          channelNames = slabels.map(v => String(v).trim());
-          console.log("USING decoder.getSignalLabels()");
-        }
-      }
-      if (channelNames.length !== numChannels && edfObject.header?.label && Array.isArray(edfObject.header.label) && edfObject.header.label.length === numChannels) {
-        channelNames = edfObject.header.label.map(v => String(v).trim());
-        console.log("USING edfObject.header.label (array)");
-      }
-      if (channelNames.length !== numChannels && typeof edfObject.header?.label === "string") {
-        let temp = edfObject.header.label.trim().split(/\s*[,;]\s*|\s+/);
-        if (temp.length === numChannels) {
-          channelNames = temp.map(v => v.trim());
-          console.log("USING edfObject.header.label (string split)");
-        }
-      }
-      if (
-        channelNames.length !== numChannels &&
-        typeof edfObject.header?.label === "string" &&
-        edfObject.header.label.length === (16 * numChannels)
-      ) {
-        let temp = [];
-        for (let i = 0; i < numChannels; i++) {
-          temp.push(edfObject.header.label.substr(i*16, 16).trim());
-        }
-        channelNames = temp;
-        console.log("USING fixed-width split from header.label string");
-      }
-      if (channelNames.length !== numChannels && edfObject.header?.channels && Array.isArray(edfObject.header.channels) && edfObject.header.channels.length === numChannels) {
-        channelNames = edfObject.header.channels.map(v => String(v).trim());
-        console.log("USING edfObject.header.channels (array)");
-      }
-      if (channelNames.length !== numChannels) {
-        channelNames = Array.from({ length: numChannels }, (_, i) => `Ch${i + 1}`);
-        console.log("USING fallback generic names");
-      }
-      console.log("Final channelNames", channelNames);
-
-      // Debugging info
-      console.log(
-        "Physical signals (first channel) range: ",
-        Math.min(...signals[0]), Math.max(...signals[0])
-      );
-
-      eegData = {
-        channel_names: channelNames,
-        sample_rate: sampleRate_local,
-        signals: signals,
-      };
-      sampleRate = sampleRate_local;
-      windowSize = 10;
-      maxWindow = Math.max(0, totalDurationSec - windowSize);
-      windowStartSec = 0;
-
-      updateUIAfterFileLoad(channelNames, totalDurationSec);
-
-      document.getElementById("toggleViewBtn").onclick = () => {
-        isStackedView = !isStackedView;
-        document.getElementById("toggleViewBtn").textContent = isStackedView
-          ? "Switch to Compact View"
-          : "Switch to Stacked View";
-        plotCurrentWindow();
-      };
-      document
-        .getElementById("applyFilter")
-        .addEventListener("click", async () => {
-          await filterInBrowser();
-        });
-      document
-        .getElementById("showPsdBtn")
-        .addEventListener("click", handlePsdToggle);
-      return;
-    } catch (e) {
-      showError("Failed to parse EDF in browser: " + e.message);
-      return;
-    }
-  }
-
-  // Try TXT next
-  try {
-    const db = await eegStore.openDB();
-    const tx = db.transaction(["eegFiles"], "readonly");
-    const store = tx.objectStore("eegFiles");
-    const request = store.get("current_text");
-    const textResult = await new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    db.close();
-    if (textResult?.data) {
-      currentFileName = textResult.filename || "Unknown File";
-      const parsed = parseTxtEEG(textResult.data);
-      eegData = parsed;
-      sampleRate = parsed.sample_rate;
-      totalDurationSec = Math.floor(parsed.signals[0].length / sampleRate);
-      windowSize = 10;
-      maxWindow = Math.max(0, totalDurationSec - windowSize);
-      windowStartSec = 0;
-      updateUIAfterFileLoad(parsed.channel_names, totalDurationSec);
-      document.getElementById("toggleViewBtn").onclick = () => {
-        isStackedView = !isStackedView;
-        document.getElementById("toggleViewBtn").textContent = isStackedView
-          ? "Switch to Compact View"
-          : "Switch to Stacked View";
-        plotCurrentWindow();
-      };
-      document
-        .getElementById("applyFilter")
-        .addEventListener("click", async () => {
-          await filterInBrowser();
-        });
-      document
-        .getElementById("showPsdBtn")
-        .addEventListener("click", handlePsdToggle);
-      return;
-    } else {
-      showError("No EEG data found in IndexedDB");
-    }
-  } catch (e) {
-    showError("No EEG data found in IndexedDB");
-  }
-}
-
-function updateUIAfterFileLoad(channelNames, totalDurationSec) {
-  document.getElementById("fileLabel").textContent = `File: ${currentFileName} (${totalDurationSec.toFixed(0)}s)`;
-  populateChannelList(channelNames);
-  setTimeout(() => {
-    initEEGTimeSlider();
-  }, 100);
-  document.getElementById("toggleViewBtn").textContent = "Switch to Compact View";
-  plotCurrentWindow();
-}
-
-function parseTxtEEG(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) throw new Error("Not enough data lines");
-  let delimiter = ",";
-  if (lines[0].split("\t").length > lines[0].split(",").length) delimiter = "\t";
-  const headers = lines[0].split(delimiter).map((h) => h.trim());
-  const numChannels = headers.length;
-  const dataRows = lines
-    .slice(1)
-    .map((l) => l.split(delimiter).map(Number))
-    .filter((row) => row.length === numChannels && row.every((v) => !isNaN(v)));
-  let sampleRate_local = 256;
-  for (const l of lines) {
-    if (/sampling[\s_]?rate/i.test(l)) {
-      const m = l.match(/\d+/);
-      if (m) sampleRate_local = parseInt(m[0]);
-    }
-  }
-  let channel_names = headers.every((h) => isNaN(Number(h)))
-    ? headers
-    : headers.map((_, i) => `Ch${i + 1}`);
-  const signals = channel_names.map((_, i) => dataRows.map((row) => row[i]));
-  return {
-    channel_names,
-    sample_rate: sampleRate_local,
-    signals,
-  };
-}
-
 async function filterInBrowser() {
-  const type = document.getElementById("filterType").value;
-  if (type === "none") return;
-  const l_freq = parseFloat(document.getElementById("lowFreq").value || "0");
-  const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
-  if (!pythonReady) {
-    alert("Python engine not ready yet");
-    return;
-  }
-  try {
-    const selectedSignals = eegData.signals;
-    pyodide.globals.set("signals", selectedSignals);
-    pyodide.globals.set("fs", sampleRate);
-    pyodide.globals.set("filter_type", type);
-    pyodide.globals.set("l_freq", l_freq);
-    pyodide.globals.set("h_freq", h_freq);
-    await pyodide.runPythonAsync(`
+    const type = document.getElementById("filterType").value;
+    if (type === "none") return;
+    const l_freq = parseFloat(document.getElementById("lowFreq").value || "0");
+    const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
+    if (!pythonReady) {
+        alert("Python engine not ready yet");
+        return;
+    }
+    try {
+        const selectedSignals = eegData.signals;
+        pyodide.globals.set("signals", selectedSignals);
+        pyodide.globals.set("fs", sampleRate);
+        pyodide.globals.set("filter_type", type);
+        pyodide.globals.set("l_freq", l_freq);
+        pyodide.globals.set("h_freq", h_freq);
+        await pyodide.runPythonAsync(`
 signals_np = [np.array(sig, dtype=np.float64) for sig in signals]
 filtered = apply_filter(signals_np, fs, filter_type, l_freq, h_freq)
-    `);
-    eegData.signals = pyodide.globals.get("filtered").toJs();
-    plotCurrentWindow();
-  } catch (err) {
-    alert("Filter error: " + err.message);
-  }
+        `);
+        eegData.signals = pyodide.globals.get("filtered").toJs();
+        plotCurrentWindow();
+    } catch (err) {
+        alert("Filter error: " + err.message);
+    }
 }
 
 async function computePSDInBrowser(signals, fs) {
-  if (!pythonReady) {
-    alert("Python engine not ready yet");
-    return;
-  }
-  pyodide.globals.set("signals", signals);
-  pyodide.globals.set("fs", fs);
-  await pyodide.runPythonAsync(`
+    if (!pythonReady) {
+        alert("Python engine not ready yet");
+        return;
+    }
+    pyodide.globals.set("signals", signals);
+    pyodide.globals.set("fs", fs);
+    await pyodide.runPythonAsync(`
 freqs_list, psd_list = compute_psd([np.array(sig, dtype=np.float64) for sig in signals], fs)
-  `);
-  const freqs = pyodide.globals.get("freqs_list").toJs()[0];
-  const psd = pyodide.globals.get("psd_list").toJs();
-  return { freqs, psd };
+    `);
+    const freqs = pyodide.globals.get("freqs_list").toJs()[0];
+    const psd = pyodide.globals.get("psd_list").toJs();
+    return { freqs, psd };
 }
 
 async function handlePsdToggle() {
@@ -551,7 +464,7 @@ function plotCurrentWindow() {
   }
 }
 
-// Slider etc. code below unchanged from previous messages
+// Slider 
 
 function initEEGTimeSlider() {
   timeSliderCanvas = document.getElementById("eegTimeSlider");
@@ -563,7 +476,7 @@ function initEEGTimeSlider() {
   const dpr = window.devicePixelRatio || 1;
   timeSliderCanvas.width = timeSliderCanvas.offsetWidth * dpr;
   timeSliderCanvas.height = 30 * dpr;
-  sliderCtx.setTransform(1, 0, 0, 1, 0, 0); // Reset any previous transform
+  sliderCtx.setTransform(1, 0, 0, 1, 0, 0); 
   sliderCtx.scale(dpr, dpr);
   drawSlider();
   timeSliderCanvas.addEventListener("mousedown", onSliderMouseDown);
