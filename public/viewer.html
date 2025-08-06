@@ -153,14 +153,14 @@
 <body>
   <!-- Sidebar -->
   <div id="sidebar">
-    <div style="display: flex; align-items: center; margin-bottom: 10px;">
-      <label style="font-size: 14px; font-weight: bold;">
-        <input type="checkbox" id="toggleAllCheckbox" checked style="margin-right: 6px;" />
-        Channels
-      </label>
+    <div style="margin-bottom: 10px;">
+      <span style="font-size: 14px; font-weight: bold;">Channels</span>
     </div>
-
-    <div id="channelList"></div>
+    <div style="margin-bottom: 8px;">
+      <button id="selectAllBtn">Select All</button>
+      <button id="unselectAllBtn">Unselect All</button>
+    </div>
+    <div id="channelList" style="margin-top: 12px;"></div>
   </div>
 
   <!-- Main content -->
@@ -226,7 +226,7 @@
 
     <script src="libs/pyodide.js"></script>
     <script src="libs/jsEDF.js"></script>
-    <script src="libs/EdfDecoder.js"></script> 
+    <script src="libs/EdfDecoder.js"></script>
     <script src="viewer.js"></script>
   </div>
 </body>
