@@ -192,34 +192,96 @@ function updateUIAfterFileLoad(channelNames, totalDurationSec) {
 }
 
 function parseTxtEEG(text) {
+  // 1. Scan header for possible sampling rate
   const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) throw new Error("Not enough data lines");
-  let delimiter = ",";
-  if (lines[0].split("\t").length > lines[0].split(",").length)
-    delimiter = "\t";
-  const headers = lines[0].split(delimiter).map((h) => h.trim());
-  const numChannels = headers.length;
-  const dataRows = lines
-    .slice(1)
-    .map((l) => l.split(delimiter).map(Number))
-    .filter((row) => row.length === numChannels && row.every((v) => !isNaN(v)));
-  let sampleRate_local = 256;
-  for (const l of lines) {
-    if (/sampling[\s_]?rate/i.test(l)) {
-      const m = l.match(/\d+/);
-      if (m) sampleRate_local = parseInt(m[0]);
+  let sampleRate = 256;
+  for (let i = 0; i < Math.min(20, lines.length); i++) {
+    if (/sampling[ _]?rate/i.test(lines[i])) {
+      const m = lines[i].match(/\d+/);
+      if (m) sampleRate = parseInt(m[0]);
     }
   }
-  let channel_names = headers.every((h) => isNaN(Number(h)))
-    ? headers
-    : headers.map((_, i) => `Ch${i + 1}`);
-  const signals = channel_names.map((_, i) => dataRows.map((row) => row[i]));
+
+  // 2. Auto-detect delimiter
+  const delims = [",", "\t", ";", "|"];
+  const header = lines[0];
+  let delimiter = ",";
+  let maxCols = 0;
+  delims.forEach(d => {
+    const cols = header.split(d).length;
+    if (cols > maxCols) {
+      maxCols = cols;
+      delimiter = d;
+    }
+  });
+
+  // 3. Column names and select real EEG channels by keyword
+  const headers = header.split(delimiter).map(h => h.trim());
+  const validKeywords = [
+    "eeg", "exg", "channel", "fp", "fz", "cz", "pz", "oz",
+    "t3", "t4", "t5", "t6", "accel"
+  ];
+  // Remove Timestamp/Sample columns
+  const ignoreKeywords = ["timestamp", "sample", "time", "index"];
+
+  // Find EEG channels by keyword; skip ignored columns
+  const channelIndexes = headers
+    .map((h, idx) =>
+      ignoreKeywords.some(kw => h.toLowerCase().includes(kw))
+        ? null
+        : (
+            validKeywords.some(kw => h.toLowerCase().includes(kw)) ||
+            /^[cfoptz]+[0-9]/i.test(h) // e.g. C3, Fp1, O2
+          )
+          ? idx
+          : null
+    )
+    .filter(idx => idx !== null);
+
+  // If keyword match fails, fallback to any column that’s numeric and not ignored
+  let channel_names = channelIndexes.map(idx => headers[idx]);
+  if (!channel_names.length) {
+    channel_names = headers.filter(
+      (h, idx) => !ignoreKeywords.some(kw => h.toLowerCase().includes(kw))
+    );
+    // Use all columns except ignored if nothing matched
+    channelIndexes.length = 0;
+    headers.forEach((h, idx) => {
+      if (!ignoreKeywords.some(kw => h.toLowerCase().includes(kw)))
+        channelIndexes.push(idx);
+    });
+  }
+
+  // 4. Parse data table
+  const dataRows = lines
+    .slice(1)
+    .map(line =>
+      line
+        .split(delimiter)
+        .filter((_, idx) => channelIndexes.includes(idx))
+        .map(v => {
+          const x = parseFloat(v);
+          // Treat all blank, NaN, Inf as 0.0 (mimic pd.replace)
+          return !isFinite(x) ? 0.0 : x;
+        })
+    )
+    .filter(row => row.length === channel_names.length);
+
+  // 5. Limit to first 10 seconds if possible
+  const sampleLimit = Math.min(sampleRate * 10, dataRows.length);
+  const limitedRows = dataRows.slice(0, sampleLimit);
+
+  // 6. Signals shape: channels x samples
+  const signals = channel_names.map((_, i) => limitedRows.map(row => row[i]));
+
   return {
+    sample_rate: sampleRate,
     channel_names,
-    sample_rate: sampleRate_local,
-    signals,
+    duration: limitedRows.length / sampleRate,
+    signals
   };
 }
+
 
 // --- Filtering and PSD in pyodide ---
 let pyodide = null;
