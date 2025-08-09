@@ -147,6 +147,57 @@
       background: #fcfcfc;
       border-top: 1px solid #ccc;
     }
+
+    /* topomap CSS  */
+
+    #multiTopomapContainer {
+      display: none;
+      margin-top: 20px;
+      padding: 25px;
+      overflow-x: auto;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-top: 1px solid #ccc;
+      border-radius: 15px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    #multiTopomapContainer>div {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    #multiTopomapContainer>div:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    #topomapMultiBtn {
+      background: linear-gradient(135deg, #9c27b0, #7b1fa2) !important;
+      color: white !important;
+      border: none !important;
+      padding: 6px 12px !important;
+      border-radius: 8px !important;
+      cursor: pointer !important;
+      font-weight: bold !important;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+      transition: all 0.3s ease !important;
+    }
+
+    #topomapMultiBtn:hover {
+      transform: translateY(-2px) !important;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3) !important;
+      background: linear-gradient(135deg, #7b1fa2, #4a148c) !important;
+    }
+
+    /* Responsive design for smaller screens */
+    @media (max-width: 768px) {
+      #multiTopomapContainer {
+        margin: 10px;
+        padding: 15px;
+      }
+    }
   </style>
 </head>
 
