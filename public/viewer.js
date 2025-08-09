@@ -849,7 +849,7 @@ function createHeadOutline() {
     };
 }
 
-// Generate frequency topomaps
+// Generate frequency topomaps in horizontal layout
 async function generateBandTopomaps() {
     if (!pythonReady) {
         alert("Python engine not ready yet");
@@ -879,22 +879,15 @@ async function generateBandTopomaps() {
         multiTopomapContainer.innerHTML = "";
         multiTopomapContainer.style.display = "block";
         
-        // Add title
-        const titleDiv = document.createElement("div");
-        titleDiv.style.textAlign = "center";
-        titleDiv.style.fontSize = "18px";
-        titleDiv.style.fontWeight = "bold";
-        titleDiv.style.marginBottom = "20px";
-        titleDiv.style.color = "white";
-        titleDiv.textContent = `EEG Frequency Topomaps (${mappedChannels.length} electrodes)`;
-        multiTopomapContainer.appendChild(titleDiv);
-        
-        // Create container for all topomaps to prevent collapse
+        // Create container for all topomaps in single horizontal row
         const topomapsWrapper = document.createElement("div");
         topomapsWrapper.style.display = "flex";
-        topomapsWrapper.style.flexWrap = "wrap";
-        topomapsWrapper.style.justifyContent = "center";
-        topomapsWrapper.style.gap = "20px";
+        topomapsWrapper.style.flexWrap = "nowrap"; // Keep all in one row
+        topomapsWrapper.style.justifyContent = "space-around";
+        topomapsWrapper.style.alignItems = "center";
+        topomapsWrapper.style.gap = "15px";
+        topomapsWrapper.style.width = "100%";
+        topomapsWrapper.style.overflowX = "auto"; // Allow horizontal scroll if needed
         multiTopomapContainer.appendChild(topomapsWrapper);
         
         for (const [bandName, [lowFreq, highFreq]] of Object.entries(FREQUENCY_BANDS)) {
@@ -913,19 +906,21 @@ async function generateBandTopomaps() {
                 electrodePositions.push([x, y]);
             }
             
-            // Create individual topomap container
+            // Create individual topomap container - smaller for horizontal layout
             const bandContainer = document.createElement("div");
-            bandContainer.style.width = "300px";
-            bandContainer.style.height = "350px";
-            bandContainer.style.padding = "15px";
+            bandContainer.style.flex = "1";
+            bandContainer.style.minWidth = "250px";
+            bandContainer.style.maxWidth = "280px";
+            bandContainer.style.height = "320px";
+            bandContainer.style.padding = "12px";
             bandContainer.style.background = "white";
             bandContainer.style.borderRadius = "12px";
             bandContainer.style.boxShadow = "0 6px 12px rgba(0,0,0,0.15)";
-            bandContainer.style.margin = "10px";
+            bandContainer.style.margin = "5px";
             
             const plotDiv = document.createElement("div");
             plotDiv.id = `topomap_${bandName.split(' ')[0]}`;
-            plotDiv.style.height = "280px";
+            plotDiv.style.height = "260px";
             plotDiv.style.width = "100%";
             bandContainer.appendChild(plotDiv);
             
@@ -1011,7 +1006,7 @@ async function generateBandTopomaps() {
             const layout = {
                 title: {
                     text: bandName,
-                    font: { size: 14 }
+                    font: { size: 13 } // Slightly smaller title
                 },
                 xaxis: { 
                     visible: false, 
@@ -1026,9 +1021,9 @@ async function generateBandTopomaps() {
                     fixedrange: true
                 },
                 showlegend: false,
-                margin: { l: 20, r: 20, t: 50, b: 20 },
-                height: 260,
-                width: 280,
+                margin: { l: 15, r: 15, t: 40, b: 15 }, // Reduced margins
+                height: 240, // Slightly smaller height
+                width: 240,  // Slightly smaller width
                 plot_bgcolor: 'white',
                 paper_bgcolor: 'white'
             };
