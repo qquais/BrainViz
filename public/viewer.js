@@ -413,15 +413,22 @@ async function handlePsdToggle() {
   const bottomControls = document.getElementById("bottomControls");
   const fileTitle = document.getElementById("fileTitle");
   const multiTopoBtn = document.getElementById("topomapMultiBtn");
+  const mainContainer = document.getElementById("main");
 
   if (!psdVisible) {
     plotDiv.style.display = "none";
     timeline.style.display = "none";
     bottomControls.style.display = "none";
     viewToggleBtn.style.display = "none";
-    if (multiTopoBtn) multiTopoBtn.style.display = "inline-block";
+    if (multiTopoBtn) {
+      multiTopoBtn.style.display = "inline-block";
+      multiTopoBtn.textContent = "Show Band Topomaps";
+    }
     psdDiv.style.display = "block";
     psdBtn.textContent = "Back to EEG";
+    
+    // Add class for coordinated layout
+    mainContainer.classList.add("psd-with-topomaps");
     
     const selectedChannels = getSelectedChannels();
     if (!selectedChannels.length) {
@@ -438,8 +445,15 @@ async function handlePsdToggle() {
     psdDiv.style.display = "none";
     psdBtn.textContent = "Show PSD";
     psdVisible = false;
+    
+    // Remove coordinated layout class
+    mainContainer.classList.remove("psd-with-topomaps");
+    
     plotCurrentWindow();
-    if (multiTopoBtn) multiTopoBtn.style.display = "none";
+    if (multiTopoBtn) {
+      multiTopoBtn.style.display = "none";
+      multiTopoBtn.textContent = "Show Band Topomaps";
+    }
     
     // Hide topomap containers
     const topomapContainer = document.getElementById("topomapContainer");
@@ -474,14 +488,18 @@ async function updatePSDPlot(selectedChannels) {
       name: selectedChannels[i],
     }));
 
+    // Calculate appropriate height based on container constraints
+    const isWithTopomaps = document.getElementById("main").classList.contains("psd-with-topomaps");
+    const plotHeight = isWithTopomaps ? Math.min(350, window.innerHeight * 0.35) : 400;
+
     Plotly.newPlot("psdPlot", traces, {
       title: { text: "Power Spectral Density (PSD)", x: 0.5 },
       xaxis: { title: "Frequency (Hz)" },
       yaxis: { title: "Power (dB/Hz)" },
-      height: 400,
+      height: plotHeight,
       margin: { l: 60, r: 40, t: 40, b: 60 },
       showlegend: true,
-    });
+    }, {responsive: true});
   } catch (err) {
     psdDiv.innerHTML = `<div style="padding: 20px; color: red;">PSD Error: ${err.message}</div>`;
   }
@@ -565,7 +583,7 @@ function plotCurrentWindow() {
         hovertemplate: `**${ch}**<br>Time: %{x:.2f}s<br>Value: %{y:.2f}<extra></extra>`,
       });
     });
-    Plotly.newPlot("plot", data, layout);
+    Plotly.newPlot("plot", data, layout, {responsive: true});
   } else {
     // Compact/superimposed
     const data = [];
@@ -592,7 +610,7 @@ function plotCurrentWindow() {
       height: 500,
       margin: { l: 60, r: 20, t: 40, b: 60 },
       showlegend: true,
-    });
+    }, {responsive: true});
   }
 }
 
@@ -614,15 +632,58 @@ function initEEGTimeSlider() {
   window.addEventListener("mouseup", () => (dragging = false));
   window.addEventListener("mousemove", onSliderMouseMove);
   document.addEventListener("keydown", handleKeyNavigation);
+  
+  // Enhanced resize handler
+  let resizeTimeout;
   window.addEventListener("resize", () => {
-    setTimeout(() => {
-      timeSliderCanvas.width = timeSliderCanvas.offsetWidth * dpr;
-      timeSliderCanvas.height = 30 * dpr;
-      sliderCtx.setTransform(1, 0, 0, 1, 0, 0);
-      sliderCtx.scale(dpr, dpr);
-      drawSlider();
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      handleResize();
     }, 100);
   });
+}
+
+function handleResize() {
+  // Handle timeline resize
+  if (timeSliderCanvas && sliderCtx) {
+    const dpr = window.devicePixelRatio || 1;
+    timeSliderCanvas.width = timeSliderCanvas.offsetWidth * dpr;
+    timeSliderCanvas.height = 30 * dpr;
+    sliderCtx.setTransform(1, 0, 0, 1, 0, 0);
+    sliderCtx.scale(dpr, dpr);
+    drawSlider();
+  }
+  
+  // Force Plotly resize for main plots
+  setTimeout(() => {
+    const plotDiv = document.getElementById("plot");
+    const psdDiv = document.getElementById("psdPlot");
+    
+    if (plotDiv && plotDiv.style.display !== "none") {
+      Plotly.Plots.resize("plot");
+    }
+    
+    if (psdDiv && psdDiv.style.display !== "none") {
+      // Update PSD plot height based on current layout
+      const isWithTopomaps = document.getElementById("main").classList.contains("psd-with-topomaps");
+      const newHeight = isWithTopomaps ? Math.min(350, window.innerHeight * 0.35) : 400;
+      
+      Plotly.relayout("psdPlot", {
+        height: newHeight
+      });
+    }
+    
+    // Resize topomap plots if visible
+    const multiTopomapContainer = document.getElementById("multiTopomapContainer");
+    if (multiTopomapContainer && multiTopomapContainer.style.display !== "none") {
+      const topomapPlots = multiTopomapContainer.querySelectorAll('.topomap-plot');
+      topomapPlots.forEach(plot => {
+        if (plot.id) {
+          Plotly.Plots.resize(plot.id);
+        }
+      });
+    }
+  }, 150);
 }
 
 function drawSlider() {
@@ -777,7 +838,7 @@ function interpolateTopomap(electrodePositions, values, gridSize = 67) {
     const yStep = (yMax - yMin) / (gridSize - 1);
     
     const x = [], y = [], z = [];
-    const headRadius = 0.095; // Slightly smaller than outline for clean edge
+    const headRadius = 0.095;
     
     for (let i = 0; i < gridSize; i++) {
         for (let j = 0; j < gridSize; j++) {
@@ -799,7 +860,6 @@ function interpolateTopomap(electrodePositions, values, gridSize = 67) {
                         weightSum = 1;
                         break;
                     } else {
-                        // Better weighting with smoother falloff
                         const weight = 1 / Math.pow(distance, 2.5);
                         weightedSum += weight * values[k];
                         weightSum += weight;
@@ -849,7 +909,7 @@ function createHeadOutline() {
     };
 }
 
-// Generate frequency topomaps in horizontal layout
+// Enhanced responsive topomap generation
 async function generateBandTopomaps() {
     if (!pythonReady) {
         alert("Python engine not ready yet");
@@ -879,15 +939,9 @@ async function generateBandTopomaps() {
         multiTopomapContainer.innerHTML = "";
         multiTopomapContainer.style.display = "block";
         
-        // Create container for all topomaps in single horizontal row
+        // Create responsive container using CSS classes
         const topomapsWrapper = document.createElement("div");
-        topomapsWrapper.style.display = "flex";
-        topomapsWrapper.style.flexWrap = "nowrap"; // Keep all in one row
-        topomapsWrapper.style.justifyContent = "space-around";
-        topomapsWrapper.style.alignItems = "center";
-        topomapsWrapper.style.gap = "15px";
-        topomapsWrapper.style.width = "100%";
-        topomapsWrapper.style.overflowX = "auto"; // Allow horizontal scroll if needed
+        topomapsWrapper.className = "topomaps-wrapper";
         multiTopomapContainer.appendChild(topomapsWrapper);
         
         for (const [bandName, [lowFreq, highFreq]] of Object.entries(FREQUENCY_BANDS)) {
@@ -906,22 +960,13 @@ async function generateBandTopomaps() {
                 electrodePositions.push([x, y]);
             }
             
-            // Create individual topomap container - smaller for horizontal layout
+            // Create individual topomap container using CSS classes
             const bandContainer = document.createElement("div");
-            bandContainer.style.flex = "1";
-            bandContainer.style.minWidth = "250px";
-            bandContainer.style.maxWidth = "280px";
-            bandContainer.style.height = "320px";
-            bandContainer.style.padding = "12px";
-            bandContainer.style.background = "white";
-            bandContainer.style.borderRadius = "12px";
-            bandContainer.style.boxShadow = "0 6px 12px rgba(0,0,0,0.15)";
-            bandContainer.style.margin = "5px";
+            bandContainer.className = "band-container";
             
             const plotDiv = document.createElement("div");
             plotDiv.id = `topomap_${bandName.split(' ')[0]}`;
-            plotDiv.style.height = "260px";
-            plotDiv.style.width = "100%";
+            plotDiv.className = "topomap-plot";
             bandContainer.appendChild(plotDiv);
             
             topomapsWrapper.appendChild(bandContainer);
@@ -1006,7 +1051,7 @@ async function generateBandTopomaps() {
             const layout = {
                 title: {
                     text: bandName,
-                    font: { size: 13 } // Slightly smaller title
+                    font: { size: 14 }
                 },
                 xaxis: { 
                     visible: false, 
@@ -1021,14 +1066,25 @@ async function generateBandTopomaps() {
                     fixedrange: true
                 },
                 showlegend: false,
-                margin: { l: 15, r: 15, t: 40, b: 15 }, // Reduced margins
-                height: 240, // Slightly smaller height
-                width: 240,  // Slightly smaller width
+                margin: { l: 10, r: 10, t: 30, b: 10 },
                 plot_bgcolor: 'white',
                 paper_bgcolor: 'white'
             };
             
-            Plotly.newPlot(plotDiv.id, traces, layout, {displayModeBar: false});
+            // Create plot and handle responsiveness
+            await Plotly.newPlot(plotDiv.id, traces, layout, {
+                displayModeBar: false, 
+                responsive: true,
+                staticPlot: false
+            });
+            
+            // Add resize observer for individual topomap
+            if (window.ResizeObserver) {
+                const resizeObserver = new ResizeObserver(() => {
+                    Plotly.Plots.resize(plotDiv.id);
+                });
+                resizeObserver.observe(plotDiv);
+            }
         }
         
     } catch (error) {
@@ -1038,6 +1094,24 @@ async function generateBandTopomaps() {
 
 // Main topomap function
 function showBandTopomaps() {
+    const multiTopomapContainer = document.getElementById("multiTopomapContainer");
+    const mainContainer = document.getElementById("main");
+    const topomapBtn = document.getElementById("topomapMultiBtn");
+    
+    // If topomaps are already visible, hide them
+    if (multiTopomapContainer.style.display === "block") {
+        multiTopomapContainer.style.display = "none";
+        mainContainer.classList.remove("psd-with-topomaps");
+        if (topomapBtn) topomapBtn.textContent = "Show Band Topomaps";
+        return;
+    }
+    
+    // Add coordinated layout class if in PSD mode
+    if (psdVisible) {
+        mainContainer.classList.add("psd-with-topomaps");
+    }
+    
+    if (topomapBtn) topomapBtn.textContent = "Hide Topomaps";
     generateBandTopomaps();
 }
 

@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EEG Clinical Viewer</title>
   <script src="libs/plotly.min.js"></script>
   <script src="eegStorage.js"></script>
@@ -40,7 +41,6 @@
       text-overflow: ellipsis;
     }
 
-
     #channelList input[type="checkbox"] {
       margin-right: 8px;
       transform: scale(1.1);
@@ -52,6 +52,7 @@
       flex-direction: column;
       background: white;
       height: 100vh;
+      min-width: 0; /* Important for flex children */
     }
 
     #fileTitle {
@@ -64,31 +65,38 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
-    #toggleViewBtn {
+    #toggleViewBtn, #showPsdBtn, #topomapMultiBtn {
       background: #2196f3;
       color: white;
       border: none;
       padding: 6px 12px;
       border-radius: 4px;
       cursor: pointer;
+      font-size: 14px;
+      white-space: nowrap;
     }
 
     #showPsdBtn {
       background: #4caf50;
-      color: white;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
-      cursor: pointer;
+    }
+
+    #topomapMultiBtn {
+      background: linear-gradient(135deg, #9c27b0, #7b1fa2) !important;
+      font-weight: bold !important;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+      transition: all 0.3s ease !important;
     }
 
     #toggleViewBtn:hover,
-    #showPsdBtn:hover {
+    #showPsdBtn:hover,
+    #topomapMultiBtn:hover {
       opacity: 0.9;
+      transform: translateY(-1px);
     }
-
 
     #plot {
       flex: 1;
@@ -148,63 +156,201 @@
       border-top: 1px solid #ccc;
     }
 
-    /* topomap CSS */
-
+    /* Enhanced responsive topomap CSS */
     #multiTopomapContainer {
       display: none;
       margin-top: 20px;
       padding: 20px;
       overflow-x: auto;
+      overflow-y: hidden;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       border-top: 1px solid #ccc;
       border-radius: 15px;
       box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
       width: 100%;
+      box-sizing: border-box;
     }
 
-    #multiTopomapContainer>div {
+    .topomaps-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 15px;
+      min-width: fit-content;
+    }
+
+    .band-container {
       background: white;
       border-radius: 12px;
       box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
       transition: transform 0.3s ease, box-shadow 0.3s ease;
+      padding: 12px;
+      box-sizing: border-box;
+      flex: 0 0 auto;
     }
 
-    #multiTopomapContainer>div:hover {
+    .band-container:hover {
       transform: translateY(-3px);
       box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
     }
 
-    #topomapMultiBtn {
-      background: linear-gradient(135deg, #9c27b0, #7b1fa2) !important;
-      color: white !important;
-      border: none !important;
-      padding: 6px 12px !important;
-      border-radius: 8px !important;
-      cursor: pointer !important;
-      font-weight: bold !important;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
-      transition: all 0.3s ease !important;
+    .topomap-plot {
+      width: 100%;
+      height: 260px;
     }
 
-    #topomapMultiBtn:hover {
-      transform: translateY(-2px) !important;
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3) !important;
-      background: linear-gradient(135deg, #7b1fa2, #4a148c) !important;
-    }
-
-    /* Responsive design for smaller screens */
-    @media (max-width: 1200px) {
-      #multiTopomapContainer {
-        padding: 15px;
+    /* Responsive breakpoints for topomaps */
+    @media (min-width: 1400px) {
+      .topomaps-wrapper {
+        flex-wrap: nowrap;
+      }
+      .band-container {
+        min-width: 280px;
+        max-width: 320px;
+        height: 320px;
+      }
+      .topomap-plot {
+        height: 280px;
       }
     }
 
-    @media (max-width: 768px) {
+    @media (min-width: 1200px) and (max-width: 1399px) {
+      .band-container {
+        min-width: 240px;
+        max-width: 280px;
+        height: 300px;
+      }
+      .topomap-plot {
+        height: 260px;
+      }
+    }
+
+    @media (min-width: 900px) and (max-width: 1199px) {
+      .topomaps-wrapper {
+        justify-content: space-around;
+      }
+      .band-container {
+        min-width: 200px;
+        max-width: 240px;
+        height: 280px;
+      }
+      .topomap-plot {
+        height: 240px;
+      }
+    }
+
+    @media (min-width: 600px) and (max-width: 899px) {
+      .topomaps-wrapper {
+        justify-content: center;
+      }
+      .band-container {
+        min-width: 180px;
+        max-width: 220px;
+        height: 260px;
+        flex: 0 0 calc(50% - 15px);
+      }
+      .topomap-plot {
+        height: 220px;
+      }
+    }
+
+    @media (max-width: 599px) {
       #multiTopomapContainer {
         margin: 10px;
-        padding: 10px;
-        overflow-x: scroll;
+        padding: 15px;
+        border-radius: 10px;
       }
+      .topomaps-wrapper {
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      .band-container {
+        min-width: 160px;
+        max-width: 200px;
+        height: 240px;
+        width: 100%;
+        max-width: calc(100% - 20px);
+      }
+      .topomap-plot {
+        height: 200px;
+      }
+    }
+
+    /* Enhanced mobile responsiveness */
+    @media (max-width: 768px) {
+      body {
+        flex-direction: row;
+      }
+      
+      #sidebar {
+        min-width: 120px;
+        max-width: 180px;
+        padding: 10px;
+      }
+      
+      #fileTitle {
+        padding: 8px 12px;
+        font-size: 14px;
+      }
+      
+      #fileTitle > div {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      
+      #toggleViewBtn, #showPsdBtn, #topomapMultiBtn {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+      
+      #bottomControls {
+        padding: 8px 12px;
+        gap: 8px;
+      }
+      
+      #bottomControls select,
+      #bottomControls input[type="number"],
+      #bottomControls button {
+        padding: 4px;
+        font-size: 12px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      #sidebar {
+        min-width: 100px;
+        max-width: 140px;
+        padding: 8px;
+      }
+      
+      #channelList label {
+        font-size: 11px;
+        margin-bottom: 2px;
+      }
+      
+      #fileTitle {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+      }
+      
+      #fileTitle > div {
+        width: 100%;
+        justify-content: flex-start;
+      }
+    }
+
+    /* Ensure plots are responsive */
+    .js-plotly-plot {
+      width: 100% !important;
+    }
+
+    .plotly .main-svg {
+      width: 100% !important;
+      height: auto !important;
     }
   </style>
 </head>
@@ -233,7 +379,6 @@
       </div>
     </div>
 
-
     <div id="plot">
       <div class="loading">🧠 Loading EEG data...</div>
     </div>
@@ -243,13 +388,10 @@
     <div id="topomapContainer" style="display: none; text-align: center; margin-top: 20px;">
       <img id="topomapImage" src="" alt="Topomap PSD" style="max-width: 400px; border-radius: 8px;" />
     </div>
-    <div id="multiTopomapContainer"
-      style="display: none; margin-top: 20px; padding: 10px; overflow-x: auto; white-space: nowrap; background: #fcfcfc; border-top: 1px solid #ccc;">
+    
+    <div id="multiTopomapContainer">
+      <!-- Topomaps will be dynamically inserted here -->
     </div>
-
-
-
-
 
     <!-- Timeline Container -->
     <div id="timelineContainer" style="padding: 0; height: 30px;">
@@ -258,7 +400,6 @@
 
     <!-- Bottom control bar -->
     <div id="bottomControls">
-
       <!-- Rejector -->
       <label for="rejectorSelect"><strong>Rejector:</strong></label>
       <select id="rejectorSelect">
@@ -280,7 +421,6 @@
       <input type="number" id="lowFreq" placeholder="Low Freq (Hz)" />
       <input type="number" id="highFreq" placeholder="High Freq (Hz)" />
       <button id="applyFilter">Apply</button>
-
     </div>
 
     <script src="libs/pyodide.js"></script>
