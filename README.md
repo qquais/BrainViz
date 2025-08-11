@@ -174,26 +174,35 @@ This extension processes EEG files locally in your browser using client-side Pyt
 
 * Supported by [MIE](https://mieweb.org/)
 * JavaScript Libraries:
+
 [Plotly.js](https://plotly.com/javascript/)- Interactive data visualization
+
 jsEDF.js - JavaScript EDF file parser
+
 EdfDecoder.js - Additional EDF decoding capabilities
 
 * Python in Browser:
 
 Pyodide - Python scientific stack in WebAssembly
+
 NumPy - Numerical computing for signal processing
+
 SciPy - Scientific computing and signal filtering
+
 OpenBLAS - Optimized linear algebra library
 
 * EEG Dataset Support:
 
 Testing with [PhysioNet](https://physionet.org/) datasets
+
 10-20 International System electrode positioning
 
 * Browser APIs:
 
 Chrome Extension APIs (Storage, Downloads, Tabs)
+
 IndexedDB for large file handling
+
 Web Workers for background processing
 
 ## Project Demo
