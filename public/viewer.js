@@ -11,6 +11,10 @@ let dragging = false;
 let windowStartSec = 0;
 let totalDurationSec = 0;
 
+// Add these variables to prevent rapid clicking issues
+let isTransitioning = false; // Prevent rapid clicking issues
+let topomapsVisible = false; // Track topomap state
+
 // Electrode positions (10-20 system)
 const ELECTRODE_POSITIONS = {
     'FP1': [-0.06, 0.08, 0.05], 'FP2': [0.06, 0.08, 0.05], 'FPZ': [0.0, 0.08, 0.05],
@@ -407,7 +411,32 @@ freqs_list, psd_list = compute_psd([np.array(sig, dtype=np.float64) for sig in s
   return { freqs, psd };
 }
 
+// New function to force hide all topomap containers
+function forceTopoloMapHide() {
+  const topomapContainer = document.getElementById("topomapContainer");
+  const multiTopomapContainer = document.getElementById("multiTopomapContainer");
+  const mainContainer = document.getElementById("main");
+  
+  if (topomapContainer) {
+    topomapContainer.style.display = "none";
+  }
+  
+  if (multiTopomapContainer) {
+    multiTopomapContainer.style.display = "none";
+  }
+  
+  // Remove any topomap-related classes
+  mainContainer.classList.remove("psd-with-topomaps");
+  
+  topomapsVisible = false;
+}
+
+// Updated handlePsdToggle function with better state management
 async function handlePsdToggle() {
+  // Prevent rapid clicking
+  if (isTransitioning) return;
+  isTransitioning = true;
+
   const plotDiv = document.getElementById("plot");
   const psdDiv = document.getElementById("psdPlot");
   const timeline = document.getElementById("timelineContainer");
@@ -419,14 +448,17 @@ async function handlePsdToggle() {
   const mainContainer = document.getElementById("main");
 
   if (!psdVisible) {
+    // Going to PSD mode
     plotDiv.style.display = "none";
     timeline.style.display = "none";
     bottomControls.style.display = "none";
     viewToggleBtn.style.display = "none";
+    
     if (multiTopoBtn) {
       multiTopoBtn.style.display = "inline-block";
       multiTopoBtn.textContent = "Show Band Topomaps";
     }
+    
     psdDiv.style.display = "block";
     psdBtn.textContent = "Back to EEG";
     
@@ -436,35 +468,45 @@ async function handlePsdToggle() {
     const selectedChannels = getSelectedChannels();
     if (!selectedChannels.length) {
       psdDiv.innerHTML = `<div style="padding: 20px; color: red;">Please select at least one channel.</div>`;
+      isTransitioning = false;
       return;
     }
     await updatePSDPlot(selectedChannels);
     psdVisible = true;
   } else {
+    // Going back to EEG mode - FORCE CLEAN STATE
+    
+    // Hide ALL topomap containers first
+    forceTopoloMapHide();
+    
+    // Then show EEG components
     plotDiv.style.display = "block";
     timeline.style.display = "block";
     bottomControls.style.display = "flex";
     viewToggleBtn.style.display = "inline-block";
     psdDiv.style.display = "none";
     psdBtn.textContent = "Show PSD";
-    psdVisible = false;
     
     // Remove coordinated layout class
     mainContainer.classList.remove("psd-with-topomaps");
     
-    plotCurrentWindow();
+    // Hide topomap button in EEG mode
     if (multiTopoBtn) {
       multiTopoBtn.style.display = "none";
       multiTopoBtn.textContent = "Show Band Topomaps";
     }
     
-    // Hide topomap containers
-    const topomapContainer = document.getElementById("topomapContainer");
-    if (topomapContainer) topomapContainer.style.display = "none";
-    const bandTopo = document.getElementById("multiTopomapContainer");
-    if (bandTopo) bandTopo.style.display = "none";
+    plotCurrentWindow();
+    psdVisible = false;
+    topomapsVisible = false; // Reset topomap state
+    
     fileTitle.style.justifyContent = "space-between";
   }
+  
+  // Allow new transitions after a brief delay
+  setTimeout(() => {
+    isTransitioning = false;
+  }, 100);
 }
 
 async function updatePSDPlot(selectedChannels) {
@@ -934,16 +976,18 @@ function createHeadOutline() {
     };
 }
 
-// Enhanced responsive topomap generation
+// Updated generateBandTopomaps to properly set state
 async function generateBandTopomaps() {
     if (!pythonReady) {
         alert("Python engine not ready yet");
+        isTransitioning = false;
         return;
     }
     
     const selectedChannels = getSelectedChannels();
     if (selectedChannels.length < 3) {
         alert("Need at least 3 channels for topomap");
+        isTransitioning = false;
         return;
     }
     
@@ -952,6 +996,7 @@ async function generateBandTopomaps() {
     
     if (mappedChannels.length < 3) {
         alert(`Only ${mappedChannels.length} channels could be mapped to electrode positions. Need at least 3.`);
+        isTransitioning = false;
         return;
     }
     
@@ -961,8 +1006,15 @@ async function generateBandTopomaps() {
         const { freqs, psd } = await computePSDInBrowser(selectedSignals, sampleRate);
         
         const multiTopomapContainer = document.getElementById("multiTopomapContainer");
+        const mainContainer = document.getElementById("main");
+        
         multiTopomapContainer.innerHTML = "";
         multiTopomapContainer.style.display = "block";
+        
+        // Add coordinated layout class if in PSD mode
+        if (psdVisible) {
+            mainContainer.classList.add("psd-with-topomaps");
+        }
         
         // Create responsive container using CSS classes
         const topomapsWrapper = document.createElement("div");
@@ -1114,30 +1166,41 @@ async function generateBandTopomaps() {
         
     } catch (error) {
         alert(`Topomaps generation failed: ${error.message}`);
+        isTransitioning = false;
     }
 }
 
-// Main topomap function
+// Updated showBandTopomaps function with better state management
 function showBandTopomaps() {
-    const multiTopomapContainer = document.getElementById("multiTopomapContainer");
-    const mainContainer = document.getElementById("main");
-    const topomapBtn = document.getElementById("topomapMultiBtn");
-    
-    // If topomaps are already visible, hide them
-    if (multiTopomapContainer.style.display === "block") {
-        multiTopomapContainer.style.display = "none";
-        mainContainer.classList.remove("psd-with-topomaps");
-        if (topomapBtn) topomapBtn.textContent = "Show Band Topomaps";
-        return;
-    }
-    
-    // Add coordinated layout class if in PSD mode
-    if (psdVisible) {
-        mainContainer.classList.add("psd-with-topomaps");
-    }
-    
+  // Prevent action if not in PSD mode
+  if (!psdVisible) return;
+  
+  // Prevent rapid clicking
+  if (isTransitioning) return;
+  isTransitioning = true;
+
+  const multiTopomapContainer = document.getElementById("multiTopomapContainer");
+  const mainContainer = document.getElementById("main");
+  const topomapBtn = document.getElementById("topomapMultiBtn");
+  
+  // Toggle topomap visibility
+  if (topomapsVisible) {
+    // Hide topomaps
+    multiTopomapContainer.style.display = "none";
+    mainContainer.classList.remove("psd-with-topomaps");
+    if (topomapBtn) topomapBtn.textContent = "Show Band Topomaps";
+    topomapsVisible = false;
+  } else {
+    // Show topomaps
     if (topomapBtn) topomapBtn.textContent = "Hide Topomaps";
+    topomapsVisible = true;
     generateBandTopomaps();
+  }
+  
+  // Allow new transitions
+  setTimeout(() => {
+    isTransitioning = false;
+  }, 100);
 }
 
 function showError(message) {
