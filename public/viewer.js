@@ -58,6 +58,9 @@ function showError(msg) {
  * Initialization logic — main entry point
  */
 document.addEventListener("DOMContentLoaded", async () => {
+  // Wait for DOM to be fully ready
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
   try {
     await initializeViewer();
   } catch (error) {
@@ -150,7 +153,7 @@ async function initializeViewer() {
         const multiTopoBtn = document.getElementById("topomapMultiBtn");
         if (multiTopoBtn) {
           multiTopoBtn.disabled = false;
-          // multiTopoBtn.title = "Show frequency topomaps";
+          // Removed title attribute to prevent tooltip
           multiTopoBtn.onclick = showBandTopomaps;
         }
         
@@ -206,7 +209,7 @@ async function initializeViewer() {
       const multiTopoBtn = document.getElementById("topomapMultiBtn");
       if (multiTopoBtn) {
         multiTopoBtn.disabled = false;
-        multiTopoBtn.title = "Show frequency topomaps";
+        // Removed title attribute to prevent tooltip
         multiTopoBtn.onclick = showBandTopomaps;
       }
       
@@ -466,6 +469,14 @@ async function handlePsdToggle() {
 
 async function updatePSDPlot(selectedChannels) {
   const psdDiv = document.getElementById("psdPlot");
+  
+  // Purge existing plot to prevent Plotly errors
+  try { 
+    Plotly.purge("psdPlot"); 
+  } catch (e) { 
+    // Ignore if no plot exists
+  }
+  
   psdDiv.innerHTML = "";
   if (!selectedChannels.length) {
     psdDiv.innerHTML = `<div style="padding: 20px; color: red;">Please select at least one channel to compute PSD.</div>`;
@@ -512,7 +523,7 @@ function populateChannelList(channelNames) {
 
   channelNames.forEach((ch) => {
     const label = document.createElement("label");
-    label.style.display = "block";
+    
     const input = document.createElement("input");
     input.type = "checkbox";
     input.value = ch;
@@ -523,8 +534,14 @@ function populateChannelList(channelNames) {
         updatePSDPlot(getSelectedChannels());
       }
     });
+    
+    // Use proper structure with channel-name span for CSS styling
+    const channelNameSpan = document.createElement("span");
+    channelNameSpan.className = "channel-name";
+    channelNameSpan.textContent = ch;
+    
     label.appendChild(input);
-    label.appendChild(document.createTextNode(ch));
+    label.appendChild(channelNameSpan);
     container.appendChild(label);
   });
 }
@@ -538,6 +555,14 @@ function getSelectedChannels() {
 function plotCurrentWindow() {
   const plotDiv = document.getElementById("plot");
   if (!plotDiv || !eegData || !eegData.signals) return;
+  
+  // Purge existing plot to prevent Plotly errors
+  try { 
+    Plotly.purge("plot"); 
+  } catch (e) { 
+    // Ignore if no plot exists
+  }
+  
   plotDiv.innerHTML = "";
   const selectedChannels = getSelectedChannels();
   if (!selectedChannels.length) {
