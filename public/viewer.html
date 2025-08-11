@@ -18,14 +18,19 @@
     }
 
     #sidebar {
-      min-width: 140px;
-      max-width: 260px;
-      width: fit-content;
+      flex: 0 1 auto;
+      /* Allow it to shrink and grow */
+      min-width: 120px;
+      max-width: 20vw;
+      /* Responsive max size */
+      width: auto;
       background: #f0f4f8;
       border-right: 1px solid #ccc;
       padding: 15px;
       box-sizing: border-box;
       overflow-y: auto;
+      overflow-x: hidden;
+      /* Prevent horizontal scroll */
       white-space: nowrap;
     }
 
@@ -39,6 +44,8 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      max-width: 100%;
+
     }
 
     #channelList input[type="checkbox"] {
@@ -52,7 +59,8 @@
       flex-direction: column;
       background: white;
       height: 100vh;
-      min-width: 0; /* Important for flex children */
+      min-width: 0;
+      /* Important for flex children */
     }
 
     #fileTitle {
@@ -69,7 +77,9 @@
       gap: 8px;
     }
 
-    #toggleViewBtn, #showPsdBtn, #topomapMultiBtn {
+    #toggleViewBtn,
+    #showPsdBtn,
+    #topomapMultiBtn {
       background: #2196f3;
       color: white;
       border: none;
@@ -162,14 +172,18 @@
       margin-top: 20px;
       padding: 20px;
       overflow-x: auto;
-      overflow-y: hidden;
+      overflow-y: auto;
+      /* Allow vertical resize if needed */
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       border-top: 1px solid #ccc;
       border-radius: 15px;
       box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
       width: 100%;
       box-sizing: border-box;
+      max-height: calc(100vh - 150px);
+      /* Fit in viewport */
     }
+
 
     .topomaps-wrapper {
       display: flex;
@@ -197,19 +211,30 @@
 
     .topomap-plot {
       width: 100%;
-      height: 260px;
+      height: auto;
+      max-height: 280px;
+      object-fit: contain;
     }
+
+    #multiTopomapContainer,
+    .band-container,
+    .topomap-plot {
+      transition: all 0.25s ease-in-out;
+    }
+
 
     /* Responsive breakpoints for topomaps */
     @media (min-width: 1400px) {
       .topomaps-wrapper {
         flex-wrap: nowrap;
       }
+
       .band-container {
         min-width: 280px;
         max-width: 320px;
         height: 320px;
       }
+
       .topomap-plot {
         height: 280px;
       }
@@ -221,6 +246,7 @@
         max-width: 280px;
         height: 300px;
       }
+
       .topomap-plot {
         height: 260px;
       }
@@ -230,11 +256,13 @@
       .topomaps-wrapper {
         justify-content: space-around;
       }
+
       .band-container {
         min-width: 200px;
         max-width: 240px;
         height: 280px;
       }
+
       .topomap-plot {
         height: 240px;
       }
@@ -244,12 +272,14 @@
       .topomaps-wrapper {
         justify-content: center;
       }
+
       .band-container {
         min-width: 180px;
         max-width: 220px;
         height: 260px;
         flex: 0 0 calc(50% - 15px);
       }
+
       .topomap-plot {
         height: 220px;
       }
@@ -261,11 +291,13 @@
         padding: 15px;
         border-radius: 10px;
       }
+
       .topomaps-wrapper {
         flex-direction: column;
         align-items: center;
         gap: 10px;
       }
+
       .band-container {
         min-width: 160px;
         max-width: 200px;
@@ -273,6 +305,7 @@
         width: 100%;
         max-width: calc(100% - 20px);
       }
+
       .topomap-plot {
         height: 200px;
       }
@@ -283,34 +316,36 @@
       body {
         flex-direction: row;
       }
-      
+
       #sidebar {
         min-width: 120px;
         max-width: 180px;
         padding: 10px;
       }
-      
+
       #fileTitle {
         padding: 8px 12px;
         font-size: 14px;
       }
-      
-      #fileTitle > div {
+
+      #fileTitle>div {
         display: flex;
         flex-wrap: wrap;
         gap: 4px;
       }
-      
-      #toggleViewBtn, #showPsdBtn, #topomapMultiBtn {
+
+      #toggleViewBtn,
+      #showPsdBtn,
+      #topomapMultiBtn {
         padding: 4px 8px;
         font-size: 12px;
       }
-      
+
       #bottomControls {
         padding: 8px 12px;
         gap: 8px;
       }
-      
+
       #bottomControls select,
       #bottomControls input[type="number"],
       #bottomControls button {
@@ -325,19 +360,19 @@
         max-width: 140px;
         padding: 8px;
       }
-      
+
       #channelList label {
         font-size: 11px;
         margin-bottom: 2px;
       }
-      
+
       #fileTitle {
         flex-direction: column;
         align-items: flex-start;
         gap: 5px;
       }
-      
-      #fileTitle > div {
+
+      #fileTitle>div {
         width: 100%;
         justify-content: flex-start;
       }
@@ -388,7 +423,7 @@
     <div id="topomapContainer" style="display: none; text-align: center; margin-top: 20px;">
       <img id="topomapImage" src="" alt="Topomap PSD" style="max-width: 400px; border-radius: 8px;" />
     </div>
-    
+
     <div id="multiTopomapContainer">
       <!-- Topomaps will be dynamically inserted here -->
     </div>
