@@ -150,7 +150,7 @@ async function initializeViewer() {
         const multiTopoBtn = document.getElementById("topomapMultiBtn");
         if (multiTopoBtn) {
           multiTopoBtn.disabled = false;
-          multiTopoBtn.title = "Show frequency topomaps";
+          // multiTopoBtn.title = "Show frequency topomaps";
           multiTopoBtn.onclick = showBandTopomaps;
         }
         
