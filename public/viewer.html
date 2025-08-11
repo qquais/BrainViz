@@ -20,7 +20,7 @@
     #sidebar {
       flex: 0 1 auto;
       /* Allow it to shrink and grow */
-      min-width: 120px;
+      min-width: 140px;
       max-width: 20vw;
       /* Responsive max size */
       width: auto;
@@ -31,7 +31,48 @@
       overflow-y: auto;
       overflow-x: hidden;
       /* Prevent horizontal scroll */
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Fixed button container styling */
+    .button-container {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 8px;
+      width: 100%;
+    }
+
+    /* Responsive button styling */
+    .sidebar-button {
+      padding: 6px 8px;
+      font-size: 12px;
+      background: #2196f3;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+      box-sizing: border-box;
+      min-height: 28px;
+    }
+
+    .sidebar-button:hover {
+      background: #1976d2;
+    }
+
+    .sidebar-button:active {
+      transform: translateY(1px);
+    }
+
+    #channelList {
+      flex: 1;
+      overflow-y: auto;
+      margin-top: 8px;
     }
 
     #channelList label {
@@ -45,12 +86,19 @@
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 100%;
-
+      padding: 2px 0;
     }
 
     #channelList input[type="checkbox"] {
       margin-right: 8px;
       transform: scale(1.1);
+      flex-shrink: 0;
+    }
+
+    .channel-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     #main {
@@ -184,7 +232,6 @@
       /* Fit in viewport */
     }
 
-
     .topomaps-wrapper {
       display: flex;
       flex-wrap: wrap;
@@ -221,7 +268,6 @@
     .topomap-plot {
       transition: all 0.25s ease-in-out;
     }
-
 
     /* Responsive breakpoints for topomaps */
     @media (min-width: 1400px) {
@@ -311,16 +357,27 @@
       }
     }
 
-    /* Enhanced mobile responsiveness */
+    /* Enhanced mobile responsiveness for sidebar */
     @media (max-width: 768px) {
       body {
         flex-direction: row;
       }
 
       #sidebar {
-        min-width: 120px;
+        min-width: 130px;
         max-width: 180px;
-        padding: 10px;
+        padding: 12px;
+      }
+
+      .sidebar-button {
+        font-size: 11px;
+        padding: 5px 6px;
+        min-height: 26px;
+      }
+
+      #channelList label {
+        font-size: 12px;
+        margin-bottom: 3px;
       }
 
       #fileTitle {
@@ -356,9 +413,19 @@
 
     @media (max-width: 480px) {
       #sidebar {
-        min-width: 100px;
+        min-width: 110px;
         max-width: 140px;
-        padding: 8px;
+        padding: 10px;
+      }
+
+      .button-container {
+        gap: 4px;
+      }
+
+      .sidebar-button {
+        font-size: 10px;
+        padding: 4px 5px;
+        min-height: 24px;
       }
 
       #channelList label {
@@ -396,11 +463,11 @@
     <div style="margin-bottom: 10px;">
       <span style="font-size: 14px; font-weight: bold;">Channels</span>
     </div>
-    <div style="margin-bottom: 8px;">
-      <button id="selectAllBtn">Select All</button>
-      <button id="unselectAllBtn">Unselect All</button>
+    <div class="button-container">
+      <button id="selectAllBtn" class="sidebar-button">Select All</button>
+      <button id="unselectAllBtn" class="sidebar-button">Unselect All</button>
     </div>
-    <div id="channelList" style="margin-top: 12px;"></div>
+    <div id="channelList"></div>
   </div>
 
   <!-- Main content -->
