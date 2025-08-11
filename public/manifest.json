@@ -27,6 +27,15 @@
     {
       "resources": [
         "libs/plotly.min.js",
+        "libs/EdfDecoder.js",
+        "libs/jsEDF.js",
+        "libs/pyodide.js",
+        "libs/pyodide.asm.wasm",
+        "libs/python_stdlib.zip",
+        "libs/pyodide-lock.json",
+        "libs/numpy-1.26.4-cp311-cp311-emscripten_3_1_46_wasm32.whl",
+        "libs/scipy-1.11.2-cp311-cp311-emscripten_3_1_46_wasm32.whl",
+        "libs/openblas-0.3.23.zip",
         "eegStorage.js",
         "viewer.html",
         "scriptInjector.js"
@@ -42,5 +51,8 @@
     "16": "icons/Brainviz16.png",
     "48": "icons/Brainviz48.png",
     "128": "icons/Brainviz128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   }
 }

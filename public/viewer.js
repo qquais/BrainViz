@@ -10,278 +10,804 @@ let sliderCtx = null;
 let dragging = false;
 let windowStartSec = 0;
 let totalDurationSec = 0;
-let currentEEGBlob = null;
 
-const FLASK_API = "https://brainviz.opensource.mieweb.org";
-// const FLASK_API = "http://localhost:5000";
-console.log("Using EEG API:", FLASK_API);
+// Add these variables to prevent rapid clicking issues
+let isTransitioning = false; // Prevent rapid clicking issues
+let topomapsVisible = false; // Track topomap state
 
+// Electrode positions (10-20 system)
+const ELECTRODE_POSITIONS = {
+    'FP1': [-0.06, 0.08, 0.05], 'FP2': [0.06, 0.08, 0.05], 'FPZ': [0.0, 0.08, 0.05],
+    'AF3': [-0.04, 0.07, 0.05], 'AF4': [0.04, 0.07, 0.05], 'AFZ': [0.0, 0.07, 0.05],
+    'F7': [-0.08, 0.03, 0.02], 'F3': [-0.05, 0.05, 0.04], 'FZ': [0.0, 0.05, 0.06],
+    'F4': [0.05, 0.05, 0.04], 'F8': [0.08, 0.03, 0.02],
+    'FC5': [-0.07, 0.02, 0.03], 'FC3': [-0.04, 0.03, 0.05], 'FC1': [-0.03, 0.02, 0.05],
+    'FCZ': [0.0, 0.02, 0.06], 'FC2': [0.03, 0.02, 0.05], 'FC4': [0.04, 0.03, 0.05], 'FC6': [0.07, 0.02, 0.03],
+    'T7': [-0.08, 0.0, 0.0], 'C5': [-0.07, 0.0, 0.02], 'C3': [-0.05, 0.0, 0.04], 'C1': [-0.025, 0.0, 0.05],
+    'CZ': [0.0, 0.0, 0.06], 'C2': [0.025, 0.0, 0.05], 'C4': [0.05, 0.0, 0.04], 'C6': [0.07, 0.0, 0.02], 'T8': [0.08, 0.0, 0.0],
+    'CP5': [-0.07, -0.02, 0.03], 'CP3': [-0.04, -0.03, 0.05], 'CP1': [-0.03, -0.02, 0.05],
+    'CPZ': [0.0, -0.02, 0.06], 'CP2': [0.03, -0.02, 0.05], 'CP4': [0.04, -0.03, 0.05], 'CP6': [0.07, -0.02, 0.03],
+    'P7': [-0.08, -0.03, 0.02], 'P5': [-0.06, -0.04, 0.03], 'P3': [-0.05, -0.05, 0.04], 'P1': [-0.03, -0.06, 0.05],
+    'PZ': [0.0, -0.05, 0.06], 'P2': [0.03, -0.06, 0.05], 'P4': [0.05, -0.05, 0.04], 'P6': [0.06, -0.04, 0.03], 'P8': [0.08, -0.03, 0.02],
+    'PO7': [-0.06, -0.06, 0.02], 'PO3': [-0.04, -0.07, 0.03], 'POZ': [0.0, -0.07, 0.05], 'PO4': [0.04, -0.07, 0.03], 'PO8': [0.06, -0.06, 0.02],
+    'O1': [-0.03, -0.08, 0.02], 'OZ': [0.0, -0.08, 0.04], 'O2': [0.03, -0.08, 0.02], 'IZ': [0.0, -0.09, 0.01],
+    'T3': [-0.08, 0.0, 0.0], 'T4': [0.08, 0.0, 0.0], 'T5': [-0.08, -0.03, 0.02], 'T6': [0.08, -0.03, 0.02],
+    'FT7': [-0.08, 0.02, 0.01], 'FT8': [0.08, 0.02, 0.01], 'FT9': [-0.09, 0.01, 0.01], 'FT10': [0.09, 0.01, 0.01],
+    'TP7': [-0.08, -0.02, 0.01], 'TP8': [0.08, -0.02, 0.01],
+};
+
+// Frequency ranges
+const FREQUENCY_BANDS = {
+    'Delta (1-4 Hz)': [1, 4],
+    'Theta (4-8 Hz)': [4, 8], 
+    'Alpha (8-13 Hz)': [8, 13],
+    'Beta (13-40 Hz)': [13, 40]
+};
+
+/**
+ * Show errors to user.
+ */
+function showError(msg) {
+  let errorDiv = document.getElementById("errorMsg");
+  if (!errorDiv) {
+    errorDiv = document.createElement("div");
+    errorDiv.id = "errorMsg";
+    errorDiv.style = "color:red; padding:1em;";
+    document.body.prepend(errorDiv);
+  }
+  errorDiv.innerHTML = msg;
+}
+
+/**
+ * Initialization logic — main entry point
+ */
 document.addEventListener("DOMContentLoaded", async () => {
+  // Wait for DOM to be fully ready
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
   try {
     await initializeViewer();
-    const multiTopoBtn = document.getElementById("topomapMultiBtn");
-    if (multiTopoBtn) {
-      multiTopoBtn.addEventListener("click", showBandTopomaps);
-    }
   } catch (error) {
     showError(`Initialization failed: ${error.message}`);
+  }
+
+  // Set up Select All/Unselect All button handlers
+  const selectAllBtn = document.getElementById("selectAllBtn");
+  const unselectAllBtn = document.getElementById("unselectAllBtn");
+  if (selectAllBtn && unselectAllBtn) {
+    selectAllBtn.onclick = function () {
+      document
+        .querySelectorAll("#channelList input[type=checkbox]")
+        .forEach((cb) => (cb.checked = true));
+      plotCurrentWindow();
+      if (psdVisible) {
+        updatePSDPlot(getSelectedChannels());
+      }
+    };
+    unselectAllBtn.onclick = function () {
+      document
+        .querySelectorAll("#channelList input[type=checkbox]")
+        .forEach((cb) => (cb.checked = false));
+      plotCurrentWindow();
+      if (psdVisible) {
+        updatePSDPlot(getSelectedChannels());
+      }
+    };
   }
 });
 
 async function initializeViewer() {
   if (typeof Plotly === "undefined") throw new Error("Plotly.js not loaded");
-
   const eegStore = new EEGStorage();
-  const edfData = await eegStore.getEDFFile();
 
-  if (edfData?.data) {
-    currentFileName = edfData.filename || "Unknown File";
-    await sendToFlaskAndLoadSignals(edfData.data);
-    return;
+  // --- EDF/BDF first using jsEDF.js ---
+  const edfDataRec = await eegStore.getEDFFile();
+  if (edfDataRec && edfDataRec.data) {
+    try {
+      const buffer =
+        edfDataRec.data instanceof ArrayBuffer
+          ? edfDataRec.data
+          : new Uint8Array(edfDataRec.data).buffer;
+      if (window.EDF) {
+        const edf = new window.EDF(new Uint8Array(buffer));
+        const labels = [];
+        for (let i = 0; i < edf.realChannelCount; i++) {
+          labels.push(edf.channels[i].label);
+        }
+        // Use the raw .data arrays for full signals
+        const signals = [];
+        for (let i = 0; i < edf.realChannelCount; i++) {
+          signals.push(edf.channels[i].data);
+        }
+        const sampleRate_local =
+          edf.sampling_rate || edf.channels[0].num_samples / edf.duration;
+        currentFileName = edfDataRec.filename || "Unknown File";
+        totalDurationSec = Math.floor(signals[0].length / sampleRate_local);
+
+        eegData = {
+          channel_names: labels,
+          sample_rate: sampleRate_local,
+          signals: signals,
+        };
+
+        sampleRate = sampleRate_local;
+        windowSize = 10;
+        maxWindow = Math.max(0, totalDurationSec - windowSize);
+        windowStartSec = 0;
+
+        updateUIAfterFileLoad(labels, totalDurationSec);
+
+        document.getElementById("toggleViewBtn").onclick = () => {
+          isStackedView = !isStackedView;
+          document.getElementById("toggleViewBtn").textContent = isStackedView
+            ? "Switch to Compact View"
+            : "Switch to Stacked View";
+          plotCurrentWindow();
+        };
+        document
+          .getElementById("applyFilter")
+          .addEventListener("click", async () => {
+            await filterInBrowser();
+          });
+        document
+          .getElementById("showPsdBtn")
+          .addEventListener("click", handlePsdToggle);
+        
+        // Enable topomap functionality
+        const multiTopoBtn = document.getElementById("topomapMultiBtn");
+        if (multiTopoBtn) {
+          multiTopoBtn.disabled = false;
+          // Removed title attribute to prevent tooltip
+          multiTopoBtn.onclick = showBandTopomaps;
+        }
+        
+        return;
+      } else {
+        showError("jsEDF library not loaded.");
+        return;
+      }
+    } catch (e) {
+      showError("Failed to parse EDF/BDF in browser: " + e.message);
+      return;
+    }
   }
 
+  // --- Try TXT fallback ---
   try {
     const db = await eegStore.openDB();
     const tx = db.transaction(["eegFiles"], "readonly");
     const store = tx.objectStore("eegFiles");
     const request = store.get("current_text");
-
     const textResult = await new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-
     db.close();
-    if (textResult?.data) {
+    if (textResult && textResult.data) {
       currentFileName = textResult.filename || "Unknown File";
-      await sendTextToFlaskAndLoadSignals(textResult.data);
+      const parsed = parseTxtEEG(textResult.data);
+      eegData = parsed;
+      sampleRate = parsed.sample_rate;
+      totalDurationSec = Math.floor(parsed.signals[0].length / sampleRate);
+      windowSize = 10;
+      maxWindow = Math.max(0, totalDurationSec - windowSize);
+      windowStartSec = 0;
+      updateUIAfterFileLoad(parsed.channel_names, totalDurationSec);
+      document.getElementById("toggleViewBtn").onclick = () => {
+        isStackedView = !isStackedView;
+        document.getElementById("toggleViewBtn").textContent = isStackedView
+          ? "Switch to Compact View"
+          : "Switch to Stacked View";
+        plotCurrentWindow();
+      };
+      document
+        .getElementById("applyFilter")
+        .addEventListener("click", async () => {
+          await filterInBrowser();
+        });
+      document
+        .getElementById("showPsdBtn")
+        .addEventListener("click", handlePsdToggle);
+      
+      // Enable topomap functionality for TXT files too
+      const multiTopoBtn = document.getElementById("topomapMultiBtn");
+      if (multiTopoBtn) {
+        multiTopoBtn.disabled = false;
+        // Removed title attribute to prevent tooltip
+        multiTopoBtn.onclick = showBandTopomaps;
+      }
+      
+      return;
     } else {
-      showError("No EEG data found in IndexedDB");
+      showError("No EEG data found in IndexedDB.");
     }
   } catch (e) {
-    showError("No EEG data found in IndexedDB");
+    showError("No EEG data found in IndexedDB.");
+    return;
   }
 }
 
-async function sendToFlaskAndLoadSignals(bufferArray) {
-  try {
-    const blob = new Blob([new Uint8Array(bufferArray)], {
-      type: "application/octet-stream",
-    });
-    currentEEGBlob = blob;
-    const formData = new FormData();
-    formData.append("file", blob, currentFileName);
-
-    const response = await fetch(`${FLASK_API}/edf-preview`, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) throw new Error(await response.text());
-
-    const result = await response.json();
-    initializeData(result);
-  } catch (error) {
-    showError(error.message);
-  }
-}
-
-async function sendTextToFlaskAndLoadSignals(text) {
-  try {
-    const blob = new Blob([text], { type: "text/plain" });
-    currentEEGBlob = blob;
-    const formData = new FormData();
-    formData.append("file", blob, currentFileName);
-
-    const response = await fetch(`${FLASK_API}/txt-preview`, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) throw new Error(await response.text());
-
-    const result = await response.json();
-    initializeData(result);
-  } catch (error) {
-    showError(error.message);
-  }
-}
-
-function initializeData(result) {
-  eegData = result;
-  sampleRate = result.sample_rate;
-  totalDurationSec = Math.floor(result.signals[0].length / sampleRate);
-  windowSize = 10;
-  maxWindow = Math.max(0, totalDurationSec - windowSize);
-  windowStartSec = 0;
-
-  console.log("EEG Data initialized:", {
-    totalDurationSec: totalDurationSec.toFixed(1),
-    maxWindow: maxWindow.toFixed(1),
-    signalLength: result.signals[0].length,
-    sampleRate,
-    windowSize,
-    channels: result.channel_names.length,
-  });
-
+function updateUIAfterFileLoad(channelNames, totalDurationSec) {
   document.getElementById(
     "fileLabel"
   ).textContent = `File: ${currentFileName} (${totalDurationSec.toFixed(0)}s)`;
-  populateChannelList(result.channel_names);
-
-  // Initialize slider after a small delay to ensure DOM is ready
+  populateChannelList(channelNames);
   setTimeout(() => {
     initEEGTimeSlider();
   }, 100);
-
   document.getElementById("toggleViewBtn").textContent =
     "Switch to Compact View";
   plotCurrentWindow();
+}
 
-  document.getElementById("toggleViewBtn").onclick = () => {
-    isStackedView = !isStackedView;
-    document.getElementById("toggleViewBtn").textContent = isStackedView
-      ? "Switch to Compact View"
-      : "Switch to Stacked View";
-    plotCurrentWindow();
-  };
+function parseTxtEEG(text) {
+  // 1. Scan header for possible sampling rate
+  const lines = text.trim().split(/\r?\n/);
+  let sampleRate = 256;
+  for (let i = 0; i < Math.min(20, lines.length); i++) {
+    if (/sampling[ _]?rate/i.test(lines[i])) {
+      const m = lines[i].match(/\d+/);
+      if (m) sampleRate = parseInt(m[0]);
+    }
+  }
 
-  document.getElementById("applyFilter").addEventListener("click", async () => {
-    const type = document.getElementById("filterType").value;
-    if (type === "none") return;
-
-    const l_freq = parseFloat(document.getElementById("lowFreq").value || "0");
-    const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
-
-    try {
-      const res = await fetch(`${FLASK_API}/filter-signal`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          signals: eegData.signals,
-          sample_rate: sampleRate,
-          filter_type: type,
-          l_freq: isNaN(l_freq) ? null : l_freq,
-          h_freq: isNaN(h_freq) ? null : h_freq,
-        }),
-      });
-
-      const result = await res.json();
-      if (result.error) throw new Error(result.error);
-
-      eegData.signals = result.filtered;
-      plotCurrentWindow();
-    } catch (err) {
-      alert("Error applying filter: " + err.message);
+  // 2. Auto-detect delimiter
+  const delims = [",", "\t", ";", "|"];
+  const header = lines[0];
+  let delimiter = ",";
+  let maxCols = 0;
+  delims.forEach(d => {
+    const cols = header.split(d).length;
+    if (cols > maxCols) {
+      maxCols = cols;
+      delimiter = d;
     }
   });
 
-  document
-    .getElementById("rejectorSelect")
-    .addEventListener("change", async (e) => {
-      const value = e.target.value;
+  // 3. Column names and select real EEG channels by keyword
+  const headers = header.split(delimiter).map(h => h.trim());
+  const validKeywords = [
+    "eeg", "exg", "channel", "fp", "fz", "cz", "pz", "oz",
+    "t3", "t4", "t5", "t6", "accel"
+  ];
+  // Remove Timestamp/Sample columns
+  const ignoreKeywords = ["timestamp", "sample", "time", "index"];
 
-      if (value === "off") {
-        const eegStore = new EEGStorage();
-        const edfData = await eegStore.getEDFFile();
-        if (edfData?.data) {
-          await sendToFlaskAndLoadSignals(edfData.data);
-        } else {
-          const db = await eegStore.openDB();
-          const tx = db.transaction(["eegFiles"], "readonly");
-          const store = tx.objectStore("eegFiles");
-          const request = store.get("current_text");
+  // Find EEG channels by keyword; skip ignored columns
+  const channelIndexes = headers
+    .map((h, idx) =>
+      ignoreKeywords.some(kw => h.toLowerCase().includes(kw))
+        ? null
+        : (
+            validKeywords.some(kw => h.toLowerCase().includes(kw)) ||
+            /^[cfoptz]+[0-9]/i.test(h) // e.g. C3, Fp1, O2
+          )
+          ? idx
+          : null
+    )
+    .filter(idx => idx !== null);
 
-          const textResult = await new Promise((resolve, reject) => {
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-          });
-
-          db.close();
-          if (textResult?.data) {
-            await sendTextToFlaskAndLoadSignals(textResult.data);
-          }
-        }
-      } else if (value === "50" || value === "60") {
-        try {
-          const res = await fetch(`${FLASK_API}/filter-signal`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              signals: eegData.signals,
-              sample_rate: sampleRate,
-              filter_type: "notch",
-              l_freq: parseFloat(value),
-            }),
-          });
-
-          const result = await res.json();
-          if (result.error) throw new Error(result.error);
-
-          eegData.signals = result.filtered;
-          plotCurrentWindow();
-        } catch (err) {
-          console.error("Rejector error:", err.message);
-        }
-      }
+  // If keyword match fails, fallback to any column that's numeric and not ignored
+  let channel_names = channelIndexes.map(idx => headers[idx]);
+  if (!channel_names.length) {
+    channel_names = headers.filter(
+      (h, idx) => !ignoreKeywords.some(kw => h.toLowerCase().includes(kw))
+    );
+    // Use all columns except ignored if nothing matched
+    channelIndexes.length = 0;
+    headers.forEach((h, idx) => {
+      if (!ignoreKeywords.some(kw => h.toLowerCase().includes(kw)))
+        channelIndexes.push(idx);
     });
+  }
 
-  document
-    .getElementById("showPsdBtn")
-    .addEventListener("click", handlePsdToggle);
+  // 4. Parse data table
+  const dataRows = lines
+    .slice(1)
+    .map(line =>
+      line
+        .split(delimiter)
+        .filter((_, idx) => channelIndexes.includes(idx))
+        .map(v => {
+          const x = parseFloat(v);
+          // Treat all blank, NaN, Inf as 0.0 (mimic pd.replace)
+          return !isFinite(x) ? 0.0 : x;
+        })
+    )
+    .filter(row => row.length === channel_names.length);
+
+  // 5. Limit to first 10 seconds if possible
+  const sampleLimit = Math.min(sampleRate * 10, dataRows.length);
+  const limitedRows = dataRows.slice(0, sampleLimit);
+
+  // 6. Signals shape: channels x samples
+  const signals = channel_names.map((_, i) => limitedRows.map(row => row[i]));
+
+  return {
+    sample_rate: sampleRate,
+    channel_names,
+    duration: limitedRows.length / sampleRate,
+    signals
+  };
 }
 
+// --- Filtering and PSD in pyodide ---
+let pyodide = null;
+let pythonReady = false;
+async function setupPyodideAndFilters() {
+  pyodide = await loadPyodide({ indexURL: "libs/" });
+  await pyodide.loadPackage(["numpy", "scipy"]);
+  await pyodide.runPythonAsync(`
+import numpy as np
+from scipy.signal import butter, filtfilt, iirnotch, welch
+def apply_filter(signals, fs, filter_type, l_freq, h_freq):
+    filtered = []
+    for sig in signals:
+        if filter_type == 'bandpass':
+            b, a = butter(4, [l_freq, h_freq], btype='bandpass', fs=fs)
+        elif filter_type == 'highpass':
+            b, a = butter(4, l_freq, btype='highpass', fs=fs)
+        elif filter_type == 'lowpass':
+            b, a = butter(4, h_freq, btype='lowpass', fs=fs)
+        elif filter_type == 'notch':
+            b, a = iirnotch(l_freq, Q=30, fs=fs)
+        else:
+            filtered.append(sig)
+            continue
+        filtered.append(filtfilt(b, a, sig))
+    return filtered
+def compute_psd(signals, fs):
+    freqs_list = []
+    psd_list = []
+    for sig in signals:
+        freqs, psd = welch(sig, fs=fs, nperseg=1024)
+        freqs_list.append(freqs)
+        psd_list.append(psd)
+    return freqs_list, psd_list
+    `);
+  pythonReady = true;
+}
+setupPyodideAndFilters();
+
+async function filterInBrowser() {
+  const type = document.getElementById("filterType").value;
+  if (type === "none") return;
+  const l_freq = parseFloat(document.getElementById("lowFreq").value || "0");
+  const h_freq = parseFloat(document.getElementById("highFreq").value || "0");
+  if (!pythonReady) {
+    alert("Python engine not ready yet");
+    return;
+  }
+  try {
+    const selectedSignals = eegData.signals;
+    pyodide.globals.set("signals", selectedSignals);
+    pyodide.globals.set("fs", sampleRate);
+    pyodide.globals.set("filter_type", type);
+    pyodide.globals.set("l_freq", l_freq);
+    pyodide.globals.set("h_freq", h_freq);
+    await pyodide.runPythonAsync(`
+signals_np = [np.array(sig, dtype=np.float64) for sig in signals]
+filtered = apply_filter(signals_np, fs, filter_type, l_freq, h_freq)
+        `);
+    eegData.signals = pyodide.globals.get("filtered").toJs();
+    plotCurrentWindow();
+  } catch (err) {
+    alert("Filter error: " + err.message);
+  }
+}
+
+async function computePSDInBrowser(signals, fs) {
+  if (!pythonReady) {
+    alert("Python engine not ready yet");
+    return;
+  }
+  pyodide.globals.set("signals", signals);
+  pyodide.globals.set("fs", fs);
+  await pyodide.runPythonAsync(`
+freqs_list, psd_list = compute_psd([np.array(sig, dtype=np.float64) for sig in signals], fs)
+    `);
+  const freqs = pyodide.globals.get("freqs_list").toJs()[0];
+  const psd = pyodide.globals.get("psd_list").toJs();
+  return { freqs, psd };
+}
+
+// New function to force hide all topomap containers
+function forceTopoloMapHide() {
+  const topomapContainer = document.getElementById("topomapContainer");
+  const multiTopomapContainer = document.getElementById("multiTopomapContainer");
+  const mainContainer = document.getElementById("main");
+  
+  if (topomapContainer) {
+    topomapContainer.style.display = "none";
+  }
+  
+  if (multiTopomapContainer) {
+    multiTopomapContainer.style.display = "none";
+  }
+  
+  // Remove any topomap-related classes
+  mainContainer.classList.remove("psd-with-topomaps");
+  
+  topomapsVisible = false;
+}
+
+// Updated handlePsdToggle function with better state management
+async function handlePsdToggle() {
+  // Prevent rapid clicking
+  if (isTransitioning) return;
+  isTransitioning = true;
+
+  const plotDiv = document.getElementById("plot");
+  const psdDiv = document.getElementById("psdPlot");
+  const timeline = document.getElementById("timelineContainer");
+  const viewToggleBtn = document.getElementById("toggleViewBtn");
+  const psdBtn = document.getElementById("showPsdBtn");
+  const bottomControls = document.getElementById("bottomControls");
+  const fileTitle = document.getElementById("fileTitle");
+  const multiTopoBtn = document.getElementById("topomapMultiBtn");
+  const mainContainer = document.getElementById("main");
+
+  if (!psdVisible) {
+    // Going to PSD mode
+    plotDiv.style.display = "none";
+    timeline.style.display = "none";
+    bottomControls.style.display = "none";
+    viewToggleBtn.style.display = "none";
+    
+    if (multiTopoBtn) {
+      multiTopoBtn.style.display = "inline-block";
+      multiTopoBtn.textContent = "Show Band Topomaps";
+    }
+    
+    psdDiv.style.display = "block";
+    psdBtn.textContent = "Back to EEG";
+    
+    // Add class for coordinated layout
+    mainContainer.classList.add("psd-with-topomaps");
+    
+    const selectedChannels = getSelectedChannels();
+    if (!selectedChannels.length) {
+      psdDiv.innerHTML = `<div style="padding: 20px; color: red;">Please select at least one channel.</div>`;
+      isTransitioning = false;
+      return;
+    }
+    await updatePSDPlot(selectedChannels);
+    psdVisible = true;
+  } else {
+    // Going back to EEG mode - FORCE CLEAN STATE
+    
+    // Hide ALL topomap containers first
+    forceTopoloMapHide();
+    
+    // Then show EEG components
+    plotDiv.style.display = "block";
+    timeline.style.display = "block";
+    bottomControls.style.display = "flex";
+    viewToggleBtn.style.display = "inline-block";
+    psdDiv.style.display = "none";
+    psdBtn.textContent = "Show PSD";
+    
+    // Remove coordinated layout class
+    mainContainer.classList.remove("psd-with-topomaps");
+    
+    // Hide topomap button in EEG mode
+    if (multiTopoBtn) {
+      multiTopoBtn.style.display = "none";
+      multiTopoBtn.textContent = "Show Band Topomaps";
+    }
+    
+    plotCurrentWindow();
+    psdVisible = false;
+    topomapsVisible = false; // Reset topomap state
+    
+    fileTitle.style.justifyContent = "space-between";
+  }
+  
+  // Allow new transitions after a brief delay
+  setTimeout(() => {
+    isTransitioning = false;
+  }, 100);
+}
+
+async function updatePSDPlot(selectedChannels) {
+  const psdDiv = document.getElementById("psdPlot");
+  
+  // Purge existing plot to prevent Plotly errors
+  try { 
+    Plotly.purge("psdPlot"); 
+  } catch (e) { 
+    // Ignore if no plot exists
+  }
+  
+  psdDiv.innerHTML = "";
+  if (!selectedChannels.length) {
+    psdDiv.innerHTML = `<div style="padding: 20px; color: red;">Please select at least one channel to compute PSD.</div>`;
+    return;
+  }
+  try {
+    const selectedIndices = selectedChannels.map((ch) =>
+      eegData.channel_names.indexOf(ch)
+    );
+    const selectedSignals = selectedIndices.map((i) => eegData.signals[i]);
+    const { freqs, psd } = await computePSDInBrowser(
+      selectedSignals,
+      sampleRate
+    );
+    const traces = psd.map((spectrum, i) => ({
+      x: freqs,
+      y: spectrum,
+      type: "scatter",
+      mode: "lines",
+      name: selectedChannels[i],
+    }));
+
+    // Calculate appropriate height based on container constraints
+    const isWithTopomaps = document.getElementById("main").classList.contains("psd-with-topomaps");
+    const plotHeight = isWithTopomaps ? Math.min(350, window.innerHeight * 0.35) : 400;
+
+    Plotly.newPlot("psdPlot", traces, {
+      title: { text: "Power Spectral Density (PSD)", x: 0.5 },
+      xaxis: { title: "Frequency (Hz)" },
+      yaxis: { title: "Power (dB/Hz)" },
+      height: plotHeight,
+      margin: { l: 60, r: 40, t: 40, b: 60 },
+      showlegend: true,
+    }, {responsive: true});
+  } catch (err) {
+    psdDiv.innerHTML = `<div style="padding: 20px; color: red;">PSD Error: ${err.message}</div>`;
+  }
+}
+
+function populateChannelList(channelNames) {
+  const container = document.getElementById("channelList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  channelNames.forEach((ch) => {
+    const label = document.createElement("label");
+    
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = ch;
+    input.checked = true;
+    input.addEventListener("change", () => {
+      plotCurrentWindow();
+      if (psdVisible) {
+        updatePSDPlot(getSelectedChannels());
+      }
+    });
+    
+    // Use proper structure with channel-name span for CSS styling
+    const channelNameSpan = document.createElement("span");
+    channelNameSpan.className = "channel-name";
+    channelNameSpan.textContent = ch;
+    
+    label.appendChild(input);
+    label.appendChild(channelNameSpan);
+    container.appendChild(label);
+  });
+}
+
+function getSelectedChannels() {
+  return Array.from(
+    document.querySelectorAll("#channelList input:checked")
+  ).map((cb) => cb.value);
+}
+
+function plotCurrentWindow() {
+  const plotDiv = document.getElementById("plot");
+  if (!plotDiv || !eegData || !eegData.signals) return;
+  
+  // Purge existing plot to prevent Plotly errors
+  try { 
+    Plotly.purge("plot"); 
+  } catch (e) { 
+    // Ignore if no plot exists
+  }
+  
+  plotDiv.innerHTML = "";
+  const selectedChannels = getSelectedChannels();
+  if (!selectedChannels.length) {
+    plotDiv.innerHTML =
+      "<div style='padding:20px;color:red;'>No channel selected.</div>";
+    return;
+  }
+  const start = Math.floor(windowStartSec * sampleRate);
+  const end = start + windowSize * sampleRate;
+  const signals = eegData.signals;
+  const channelNames = eegData.channel_names;
+
+  if (isStackedView) {
+    const data = [];
+    const layout = {
+      title: { text: `EEG Signal (Stacked)`, x: 0.5 },
+      grid: {
+        rows: selectedChannels.length,
+        columns: 1,
+        pattern: "independent",
+      },
+      height: Math.max(selectedChannels.length * 100, 500),
+      margin: { l: 60, r: 20, t: 40, b: 40 },
+      showlegend: false,
+    };
+    selectedChannels.forEach((ch, idx) => {
+      const chIdx = channelNames.indexOf(ch);
+      const signal = signals[chIdx].slice(start, end);
+      const time = Array.from(
+        { length: signal.length },
+        (_, i) => (start + i) / sampleRate
+      );
+      data.push({
+        x: time,
+        y: signal,
+        type: "scatter",
+        mode: "lines",
+        name: ch,
+        xaxis: `x${idx + 1}`,
+        yaxis: `y${idx + 1}`,
+        line: { width: 1 },
+        hoverlabel: { bgcolor: "#eee", font: { size: 11 } },
+        hovertemplate: `**${ch}**<br>Time: %{x:.2f}s<br>Value: %{y:.2f}<extra></extra>`,
+      });
+    });
+    Plotly.newPlot("plot", data, layout, {responsive: true});
+  } else {
+    // Compact/superimposed
+    const data = [];
+    selectedChannels.forEach((ch) => {
+      const chIdx = channelNames.indexOf(ch);
+      const signal = signals[chIdx].slice(start, end);
+      const time = Array.from(
+        { length: signal.length },
+        (_, i) => (start + i) / sampleRate
+      );
+      data.push({
+        x: time,
+        y: signal,
+        type: "scatter",
+        mode: "lines",
+        name: ch,
+        line: { width: 1 },
+      });
+    });
+    Plotly.newPlot("plot", data, {
+      title: { text: "EEG Signal (Compact)", x: 0.5 },
+      xaxis: { title: "Time (s)" },
+      yaxis: { title: "Amplitude (µV)" },
+      height: 500,
+      margin: { l: 60, r: 20, t: 40, b: 60 },
+      showlegend: true,
+    }, {responsive: true});
+  }
+}
+
+// Slider functions
 function initEEGTimeSlider() {
   timeSliderCanvas = document.getElementById("eegTimeSlider");
   if (!timeSliderCanvas) {
     console.error("Timeline canvas not found!");
     return;
   }
-
   sliderCtx = timeSliderCanvas.getContext("2d");
-  const container = timeSliderCanvas.parentElement;
-  const containerRect = container.getBoundingClientRect();
-  timeSliderCanvas.style.width = "100%";
-  timeSliderCanvas.style.height = "30px";
-  const rect = timeSliderCanvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
-
-  timeSliderCanvas.width = rect.width * dpr;
-  timeSliderCanvas.height = rect.height * dpr;
-
+  timeSliderCanvas.width = timeSliderCanvas.offsetWidth * dpr;
+  timeSliderCanvas.height = 30 * dpr;
+  sliderCtx.setTransform(1, 0, 0, 1, 0, 0);
   sliderCtx.scale(dpr, dpr);
-
-  console.log("Canvas initialized:", {
-    width: rect.width,
-    height: rect.height,
-    totalDuration: totalDurationSec,
-  });
-
   drawSlider();
-
   timeSliderCanvas.addEventListener("mousedown", onSliderMouseDown);
   window.addEventListener("mouseup", () => (dragging = false));
   window.addEventListener("mousemove", onSliderMouseMove);
   document.addEventListener("keydown", handleKeyNavigation);
-
-  // Handle window resize
+  
+  // Enhanced resize handler
+  let resizeTimeout;
   window.addEventListener("resize", () => {
-    setTimeout(() => {
-      const newRect = timeSliderCanvas.getBoundingClientRect();
-      timeSliderCanvas.width = newRect.width * dpr;
-      timeSliderCanvas.height = newRect.height * dpr;
-      sliderCtx.scale(dpr, dpr);
-      drawSlider();
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      handleResize();
     }, 100);
   });
 }
 
+function handleResize() {
+  // Handle timeline resize
+  if (timeSliderCanvas && sliderCtx) {
+    const dpr = window.devicePixelRatio || 1;
+    timeSliderCanvas.width = timeSliderCanvas.offsetWidth * dpr;
+    timeSliderCanvas.height = 30 * dpr;
+    sliderCtx.setTransform(1, 0, 0, 1, 0, 0);
+    sliderCtx.scale(dpr, dpr);
+    drawSlider();
+  }
+  
+  // Force Plotly resize for main plots
+  setTimeout(() => {
+    const plotDiv = document.getElementById("plot");
+    const psdDiv = document.getElementById("psdPlot");
+    
+    if (plotDiv && plotDiv.style.display !== "none") {
+      Plotly.Plots.resize("plot");
+    }
+    
+    if (psdDiv && psdDiv.style.display !== "none") {
+      // Update PSD plot height based on current layout
+      const isWithTopomaps = document.getElementById("main").classList.contains("psd-with-topomaps");
+      const newHeight = isWithTopomaps ? Math.min(350, window.innerHeight * 0.35) : 400;
+      
+      Plotly.relayout("psdPlot", {
+        height: newHeight
+      });
+    }
+    
+    // Resize topomap plots if visible
+    const multiTopomapContainer = document.getElementById("multiTopomapContainer");
+    if (multiTopomapContainer && multiTopomapContainer.style.display !== "none") {
+      const topomapPlots = multiTopomapContainer.querySelectorAll('.topomap-plot');
+      topomapPlots.forEach(plot => {
+        if (plot.id) {
+          Plotly.Plots.resize(plot.id);
+        }
+      });
+    }
+  }, 150);
+}
+
+function drawSlider() {
+  if (!timeSliderCanvas || !sliderCtx) return;
+  const width = timeSliderCanvas.offsetWidth;
+  const height = 30;
+  sliderCtx.clearRect(0, 0, width, height);
+  sliderCtx.fillStyle = "#ffffff";
+  sliderCtx.fillRect(0, 0, width, height);
+  sliderCtx.strokeStyle = "#ddd";
+  sliderCtx.strokeRect(0, 0, width, height);
+  if (totalDurationSec <= 0) return;
+  const timeSpan = totalDurationSec;
+  const cursorX = (windowStartSec / timeSpan) * width;
+  sliderCtx.beginPath();
+  sliderCtx.strokeStyle = "#888";
+  sliderCtx.lineWidth = 4;
+  sliderCtx.moveTo(cursorX, 0);
+  sliderCtx.lineTo(cursorX, height);
+  sliderCtx.stroke();
+  sliderCtx.lineWidth = 1;
+  sliderCtx.fillStyle = "#333";
+  sliderCtx.font = "10px Arial";
+  sliderCtx.textAlign = "center";
+  sliderCtx.fillText(formatTime(windowStartSec), cursorX, 10);
+}
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function onSliderMouseDown(e) {
+  dragging = true;
+  onSliderMouseMove(e);
+}
+
+function onSliderMouseMove(e) {
+  if (!dragging) return;
+  const rect = timeSliderCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const percent = Math.max(0, Math.min(1, x / rect.width));
+  const maxStart = Math.max(0, totalDurationSec - windowSize);
+  const newWindowStart = percent * maxStart;
+  windowStartSec = Math.max(
+    0,
+    Math.min(maxStart, Math.round(newWindowStart * 10) / 10)
+  );
+  drawSlider();
+  plotCurrentWindow();
+}
+
 function handleKeyNavigation(e) {
   if (!eegData) return;
-
   let moved = false;
   const step = 1;
-
   switch (e.key) {
     case "ArrowLeft":
       e.preventDefault();
@@ -314,446 +840,375 @@ function handleKeyNavigation(e) {
       moved = true;
       break;
   }
-
   if (moved) {
-    console.log(`Keyboard navigation: moved to ${windowStartSec.toFixed(1)}s`);
     drawSlider();
     plotCurrentWindow();
   }
 }
 
-function formatTime(seconds) {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
+// Clean channel name function
+function cleanChannelName(chName) {
+    let ch = String(chName).toUpperCase();
+    ch = ch.replace(/EEG\s*/g, "").replace(/REF/g, "").replace(/\./g, "").replace(/\s/g, "").replace(/-/g, "");
+    ch = ch.replace(/_/g, "").replace(/CH/g, "").replace(/CHANNEL/g, "");
+    return ch;
 }
 
-function drawSlider() {
-  if (!timeSliderCanvas || !sliderCtx) return;
-
-  const rect = timeSliderCanvas.getBoundingClientRect();
-  const width = rect.width;
-  const height = rect.height;
-
-  sliderCtx.clearRect(0, 0, width, height);
-  sliderCtx.fillStyle = "#ffffff";
-  sliderCtx.fillRect(0, 0, width, height);
-  sliderCtx.strokeStyle = "#ddd";
-  sliderCtx.strokeRect(0, 0, width, height);
-
-  if (totalDurationSec <= 0) return;
-
-  const timeSpan = totalDurationSec;
-  const cursorX = (windowStartSec / timeSpan) * width;
-
-  // Only draw the vertical slider line
-  sliderCtx.beginPath();
-  sliderCtx.strokeStyle = "#888"; // grey
-  sliderCtx.lineWidth = 4;
-  sliderCtx.moveTo(cursorX, 0);
-  sliderCtx.lineTo(cursorX, height);
-  sliderCtx.stroke();
-  sliderCtx.lineWidth = 1; // reset
-
-  // Time label on top of the line
-  sliderCtx.fillStyle = "#333";
-  sliderCtx.font = "10px Arial";
-  sliderCtx.textAlign = "center";
-  sliderCtx.fillText(formatTime(windowStartSec), cursorX, 10);
+// Map channels to standard electrode positions
+function mapChannelsToElectrodes(channelNames) {
+    const channelMapping = {};
+    const usedNames = new Set();
+    
+    for (const ch of channelNames) {
+        const cleanCh = cleanChannelName(ch);
+        let bestMatch = null;
+        
+        // Direct match
+        if (cleanCh in ELECTRODE_POSITIONS && !usedNames.has(cleanCh)) {
+            bestMatch = cleanCh;
+        } else {
+            // Handle differential montage (take first electrode)
+            if (ch.includes('-')) {
+                const firstPart = cleanChannelName(ch.split('-')[0]);
+                if (firstPart in ELECTRODE_POSITIONS && !usedNames.has(firstPart)) {
+                    bestMatch = firstPart;
+                }
+            }
+            
+            // Fuzzy matching
+            if (!bestMatch) {
+                for (const standardName of Object.keys(ELECTRODE_POSITIONS)) {
+                    if (!usedNames.has(standardName)) {
+                        if (cleanCh.includes(standardName) || standardName.includes(cleanCh) ||
+                            cleanCh.replace('Z', '') === standardName.replace('Z', '')) {
+                            bestMatch = standardName;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (bestMatch) {
+            channelMapping[ch] = bestMatch;
+            usedNames.add(bestMatch);
+        }
+    }
+    
+    return channelMapping;
 }
 
-function onSliderMouseDown(e) {
-  dragging = true;
-  onSliderMouseMove(e);
+// Interpolate values for topomap using inverse distance weighting
+function interpolateTopomap(electrodePositions, values, gridSize = 67) {
+    const xMin = -0.12, xMax = 0.12, yMin = -0.12, yMax = 0.12;
+    const xStep = (xMax - xMin) / (gridSize - 1);
+    const yStep = (yMax - yMin) / (gridSize - 1);
+    
+    const x = [], y = [], z = [];
+    const headRadius = 0.095;
+    
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+            const xi = xMin + i * xStep;
+            const yi = yMin + j * yStep;
+            
+            // Check if point is within head circle
+            const radius = Math.sqrt(xi * xi + yi * yi);
+            if (radius <= headRadius) {
+                let weightedSum = 0;
+                let weightSum = 0;
+                
+                for (let k = 0; k < electrodePositions.length; k++) {
+                    const [ex, ey] = electrodePositions[k];
+                    const distance = Math.sqrt((xi - ex) ** 2 + (yi - ey) ** 2);
+                    
+                    if (distance < 1e-6) {
+                        weightedSum = values[k];
+                        weightSum = 1;
+                        break;
+                    } else {
+                        const weight = 1 / Math.pow(distance, 2.5);
+                        weightedSum += weight * values[k];
+                        weightSum += weight;
+                    }
+                }
+                
+                x.push(xi);
+                y.push(yi);
+                z.push(weightSum > 0 ? weightedSum / weightSum : 0);
+            }
+        }
+    }
+    
+    return { x, y, z };
 }
 
-function onSliderMouseMove(e) {
-  if (!dragging) return;
-
-  const rect = timeSliderCanvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const percent = Math.max(0, Math.min(1, x / rect.width));
-  const maxStart = Math.max(0, totalDurationSec - windowSize);
-  const newWindowStart = percent * maxStart;
-  windowStartSec = Math.max(
-    0,
-    Math.min(maxStart, Math.round(newWindowStart * 10) / 10)
-  ); // Round to 0.1s precision
-
-  console.log("Slider moved:", {
-    percent: percent.toFixed(3),
-    newWindowStart: newWindowStart.toFixed(1),
-    windowStartSec: windowStartSec.toFixed(1),
-    maxStart: maxStart.toFixed(1),
-    totalDuration: totalDurationSec,
-  });
-
-  drawSlider();
-  plotCurrentWindow();
-}
-
-function populateChannelList(channelNames) {
-  setupChannelToggleButtons();
-  const container = document.getElementById("channelList");
-  if (!container) return;
-  container.innerHTML = "";
-
-  channelNames.forEach((ch) => {
-    const label = document.createElement("label");
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.value = ch;
-    input.checked = true;
-
-    input.addEventListener("change", () => {
-      plotCurrentWindow();
-
-      if (psdVisible) {
-        const selected = Array.from(
-          document.querySelectorAll("#channelList input:checked")
-        ).map((cb) => cb.value);
-        updatePSDPlot(selected);
-      }
-    });
-
-    label.appendChild(input);
-    label.appendChild(document.createTextNode(ch));
-    container.appendChild(label);
-  });
-}
-
-function plotCurrentWindow() {
-  const plotDiv = document.getElementById("plot");
-  plotDiv.innerHTML = "";
-
-  const selectedChannels = Array.from(
-    document.querySelectorAll("#channelList input:checked")
-  ).map((cb) => cb.value);
-
-  const start = windowStartSec * sampleRate;
-  const end = start + windowSize * sampleRate;
-
-  if (isStackedView) {
-    const data = [];
-    const layout = {
-      title: { text: `EEG Signal (Stacked)`, x: 0.5 },
-      grid: {
-        rows: selectedChannels.length,
-        columns: 1,
-        pattern: "independent",
-      },
-      height: Math.max(selectedChannels.length * 100, 500),
-      margin: { l: 60, r: 20, t: 40, b: 40 },
-      showlegend: false,
+// Create head outline
+function createHeadOutline() {
+    const numPoints = 100;
+    const headRadius = 0.095;
+    
+    // Main head circle
+    const headX = [], headY = [];
+    for (let i = 0; i <= numPoints; i++) {
+        const angle = (i / numPoints) * 2 * Math.PI;
+        headX.push(headRadius * Math.cos(angle));
+        headY.push(headRadius * Math.sin(angle));
+    }
+    
+    // Nose (triangle pointing up)
+    const noseX = [0, -0.012, 0.012, 0];
+    const noseY = [headRadius, headRadius + 0.018, headRadius + 0.018, headRadius];
+    
+    // Left ear
+    const leftEarX = [-headRadius, -headRadius - 0.008, -headRadius - 0.008, -headRadius];
+    const leftEarY = [0.025, 0.035, -0.035, -0.025];
+    
+    // Right ear
+    const rightEarX = [headRadius, headRadius + 0.008, headRadius + 0.008, headRadius];
+    const rightEarY = [0.025, 0.035, -0.035, -0.025];
+    
+    return {
+        head: { x: headX, y: headY },
+        nose: { x: noseX, y: noseY },
+        leftEar: { x: leftEarX, y: leftEarY },
+        rightEar: { x: rightEarX, y: rightEarY }
     };
-
-    selectedChannels.forEach((ch, idx) => {
-      const chIdx = eegData.channel_names.indexOf(ch);
-      const signal = eegData.signals[chIdx].slice(start, end);
-      const time = Array.from(
-        { length: signal.length },
-        (_, i) => (start + i) / sampleRate
-      );
-
-      data.push({
-        x: time,
-        y: signal,
-        type: "scatter",
-        mode: "lines",
-        name: ch,
-        xaxis: `x${idx + 1}`,
-        yaxis: `y${idx + 1}`,
-        line: { width: 1 },
-        hoverlabel: { bgcolor: "#eee", font: { size: 11 } },
-        hovertemplate: `<b>${ch}</b><br>Time: %{x:.2f}s<br>Value: %{y:.2f}<extra></extra>`,
-      });
-
-      layout[`xaxis${idx + 1}`] = {
-        title: idx === selectedChannels.length - 1 ? "Time (s)" : "",
-        showticklabels: idx === selectedChannels.length - 1,
-      };
-      layout[`yaxis${idx + 1}`] = {
-        title: ch.length > 12 ? ch.slice(0, 10) + "…" : ch,
-        titlefont: { size: 10 },
-        tickfont: { size: 10 },
-        zeroline: false,
-      };
-    });
-
-    Plotly.newPlot("plot", data, layout, { responsive: true });
-  } else {
-    const traces = selectedChannels.map((ch) => {
-      const chIdx = eegData.channel_names.indexOf(ch);
-      const signal = eegData.signals[chIdx].slice(start, end);
-      const time = Array.from(
-        { length: signal.length },
-        (_, i) => (start + i) / sampleRate
-      );
-      return {
-        x: time,
-        y: signal,
-        type: "scatter",
-        mode: "lines",
-        name: ch,
-        line: { width: 1.2 },
-      };
-    });
-
-    const layout = {
-      title: { text: `EEG Signal (Compact)`, x: 0.5 },
-      xaxis: { title: "Time (s)" },
-      yaxis: { title: "Amplitude (µV)" },
-      height: window.innerHeight - 140,
-      margin: { l: 60, r: 40, t: 40, b: 60 },
-      showlegend: true,
-    };
-
-    Plotly.newPlot("plot", traces, layout, { responsive: true });
-  }
 }
 
-async function handlePsdToggle() {
-  const plotDiv = document.getElementById("plot");
-  const psdDiv = document.getElementById("psdPlot");
-  const timeline = document.getElementById("timelineContainer");
-  const viewToggleBtn = document.getElementById("toggleViewBtn");
-  const psdBtn = document.getElementById("showPsdBtn");
-  const bottomControls = document.getElementById("bottomControls");
-  const fileTitle = document.getElementById("fileTitle");
-  const multiTopoBtn = document.getElementById("topomapMultiBtn");
-
-  if (!psdVisible) {
-    // Switch to PSD mode
-    plotDiv.style.display = "none";
-    timeline.style.display = "none";
-    bottomControls.style.display = "none";
-    viewToggleBtn.style.display = "none";
-    multiTopoBtn.style.display = "inline-block";
-    psdDiv.style.display = "block";
-    psdBtn.textContent = "Back to EEG";
-
+// Updated generateBandTopomaps to properly set state
+async function generateBandTopomaps() {
+    if (!pythonReady) {
+        alert("Python engine not ready yet");
+        isTransitioning = false;
+        return;
+    }
+    
     const selectedChannels = getSelectedChannels();
-    if (!selectedChannels.length) {
-      psdDiv.innerHTML = `<div style="padding: 20px; color: red;">Please select at least one channel for PSD.</div>`;
-      return;
+    if (selectedChannels.length < 3) {
+        alert("Need at least 3 channels for topomap");
+        isTransitioning = false;
+        return;
     }
-
-    await updatePSDPlot(selectedChannels);
-    psdVisible = true;
-  } else {
-    // Back to EEG mode
-    plotDiv.style.display = "block";
-    timeline.style.display = "block";
-    bottomControls.style.display = "flex";
-    viewToggleBtn.style.display = "inline-block";
-    psdDiv.style.display = "none";
-    psdBtn.textContent = "Show PSD";
-    psdVisible = false;
-    plotCurrentWindow();
-
-    // hide topomap containers
-    if (multiTopoBtn) multiTopoBtn.style.display = "none";
-    const topomapContainer = document.getElementById("topomapContainer");
-    if (topomapContainer) topomapContainer.style.display = "none";
-    const bandTopo = document.getElementById("multiTopomapContainer");
-    if (bandTopo) bandTopo.style.display = "none";
-
-    fileTitle.style.justifyContent = "space-between";
-  }
-}
-
-async function updatePSDPlot(selectedChannels) {
-  const psdDiv = document.getElementById("psdPlot");
-  psdDiv.innerHTML = "";
-
-  if (!selectedChannels.length) {
-    psdDiv.innerHTML = `<div style="padding: 20px; color: red;">Please select at least one channel to compute PSD.</div>`;
-    return;
-  }
-
-  try {
-    const selectedIndices = selectedChannels.map((ch) =>
-      eegData.channel_names.indexOf(ch)
-    );
-    const selectedSignals = selectedIndices.map((i) => eegData.signals[i]);
-
-    const res = await fetch(`${FLASK_API}/psd`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        signals: selectedSignals,
-        sample_rate: sampleRate,
-      }),
-    });
-
-    if (!res.ok) throw new Error(await res.text());
-
-    const psdData = await res.json();
-    if (psdData.error) throw new Error(psdData.error);
-
-    const traces = psdData.psd.map((spectrum, i) => ({
-      x: psdData.freqs,
-      y: spectrum,
-      type: "scatter",
-      mode: "lines",
-      name: selectedChannels[i],
-    }));
-
-    Plotly.newPlot("psdPlot", traces, {
-      title: { text: "Power Spectral Density (PSD)", x: 0.5 },
-      xaxis: { title: "Frequency (Hz)" },
-      yaxis: { title: "Power (dB/Hz)" },
-      height: 400,
-      margin: { l: 60, r: 40, t: 40, b: 60 },
-      showlegend: true,
-    });
-  } catch (err) {
-    psdDiv.innerHTML = `<div style="padding: 20px; color: red;">PSD Error: ${err.message}</div>`;
-  }
-}
-
-function setupChannelToggleButtons() {
-  const toggleAllCheckbox = document.getElementById("toggleAllCheckbox");
-  if (!toggleAllCheckbox) return;
-
-  toggleAllCheckbox.addEventListener("change", () => {
-    const checked = toggleAllCheckbox.checked;
-    document
-      .querySelectorAll("#channelList input[type='checkbox']")
-      .forEach((cb) => (cb.checked = checked));
-
-    plotCurrentWindow();
-    if (psdVisible) updatePSDPlot(getSelectedChannels());
-  });
-}
-
-async function fetchTopomap(freq) {
-  if (!currentEEGBlob) {
-    alert("EEG data not available yet.");
-    return;
-  }
-
-  if (
-    currentFileName.endsWith(".txt") ||
-    currentEEGBlob.type === "text/plain"
-  ) {
-    alert(
-      "Topomap requires EDF file format. Text files are not supported for topography."
-    );
-    return;
-  }
-
-  try {
-    const formData = new FormData();
-    formData.append("file", currentEEGBlob, "eeg.edf");
-    formData.append("freq", freq);
-
-    const response = await fetch(`${FLASK_API}/psd-topomap`, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Topomap failed: ${response.status}`);
+    
+    const channelMapping = mapChannelsToElectrodes(selectedChannels);
+    const mappedChannels = Object.keys(channelMapping);
+    
+    if (mappedChannels.length < 3) {
+        alert(`Only ${mappedChannels.length} channels could be mapped to electrode positions. Need at least 3.`);
+        isTransitioning = false;
+        return;
     }
-
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-
-    const container = document.getElementById("topomapContainer");
-    const img = document.getElementById("topomapImage");
-
-    if (img && container) {
-      img.src = url;
-      container.style.display = "block";
-      img.style.display = "block";
-    }
-
-    console.log("Topomap displayed successfully");
-  } catch (error) {
-    console.error("Topomap error:", error);
-    alert(`Topomap failed: ${error.message}`);
-  }
-}
-
-async function showBandTopomaps() {
-  if (!currentEEGBlob) {
-    alert("EEG data not available yet.");
-    return;
-  }
-
-  if (
-    currentFileName.endsWith(".txt") ||
-    currentEEGBlob.type === "text/plain"
-  ) {
-    alert(
-      "Topomap requires EDF file format. Text files are not supported for topography."
-    );
-    return;
-  }
-
-  const freqBands = [
-    { name: "Delta", freq: 2 },
-    { name: "Theta", freq: 6 },
-    { name: "Alpha", freq: 10 },
-    { name: "Beta", freq: 20 },
-    { name: "Gamma", freq: 40 },
-  ];
-
-  const container = document.getElementById("multiTopomapContainer");
-  container.innerHTML = "";
-  container.style.display = "block";
-
-  for (const band of freqBands) {
-    const formData = new FormData();
-    formData.append("file", currentEEGBlob, "eeg.edf");
-    formData.append("freq", band.freq);
-
+    
     try {
-      const res = await fetch(`${FLASK_API}/psd-topomap`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error(`${band.name} fetch failed`);
-
-      const blob = await res.blob();
-      const imgUrl = URL.createObjectURL(blob);
-
-      const wrapper = document.createElement("div");
-      wrapper.style.display = "inline-block";
-      wrapper.style.verticalAlign = "top";
-      wrapper.style.marginRight = "20px";
-      wrapper.style.textAlign = "center";
-
-      const label = document.createElement("div");
-      label.textContent = `${band.name} (${band.freq} Hz)`;
-      label.style.fontSize = "14px";
-      label.style.marginBottom = "4px";
-
-      const img = document.createElement("img");
-      img.src = imgUrl;
-      img.alt = band.name;
-      img.style.maxWidth = "160px";
-      img.style.borderRadius = "8px";
-      img.style.display = "block";
-
-      wrapper.appendChild(label);
-      wrapper.appendChild(img);
-      container.appendChild(wrapper);
-    } catch (err) {
-      console.error(`Topomap error for ${band.name}:`, err);
+        const selectedIndices = mappedChannels.map(ch => eegData.channel_names.indexOf(ch));
+        const selectedSignals = selectedIndices.map(i => eegData.signals[i]);
+        const { freqs, psd } = await computePSDInBrowser(selectedSignals, sampleRate);
+        
+        const multiTopomapContainer = document.getElementById("multiTopomapContainer");
+        const mainContainer = document.getElementById("main");
+        
+        multiTopomapContainer.innerHTML = "";
+        multiTopomapContainer.style.display = "block";
+        
+        // Add coordinated layout class if in PSD mode
+        if (psdVisible) {
+            mainContainer.classList.add("psd-with-topomaps");
+        }
+        
+        // Create responsive container using CSS classes
+        const topomapsWrapper = document.createElement("div");
+        topomapsWrapper.className = "topomaps-wrapper";
+        multiTopomapContainer.appendChild(topomapsWrapper);
+        
+        for (const [bandName, [lowFreq, highFreq]] of Object.entries(FREQUENCY_BANDS)) {
+            // Calculate average power in frequency range
+            const freqMask = freqs.map(f => f >= lowFreq && f <= highFreq);
+            const bandPower = psd.map(spectrum => {
+                const bandValues = spectrum.filter((_, i) => freqMask[i]);
+                return bandValues.reduce((a, b) => a + b, 0) / bandValues.length;
+            });
+            
+            // Get electrode positions
+            const electrodePositions = [];
+            for (let i = 0; i < mappedChannels.length; i++) {
+                const standardName = channelMapping[mappedChannels[i]];
+                const [x, y, z] = ELECTRODE_POSITIONS[standardName];
+                electrodePositions.push([x, y]);
+            }
+            
+            // Create individual topomap container using CSS classes
+            const bandContainer = document.createElement("div");
+            bandContainer.className = "band-container";
+            
+            const plotDiv = document.createElement("div");
+            plotDiv.id = `topomap_${bandName.split(' ')[0]}`;
+            plotDiv.className = "topomap-plot";
+            bandContainer.appendChild(plotDiv);
+            
+            topomapsWrapper.appendChild(bandContainer);
+            
+            // Generate topomap for this frequency range
+            const interpolated = interpolateTopomap(electrodePositions, bandPower, 50);
+            const headOutline = createHeadOutline();
+            
+            const xRange = Array.from(new Set(interpolated.x)).sort((a, b) => a - b);
+            const yRange = Array.from(new Set(interpolated.y)).sort((a, b) => a - b);
+            
+            const zGrid = [];
+            for (let i = 0; i < yRange.length; i++) {
+                const row = [];
+                for (let j = 0; j < xRange.length; j++) {
+                    const idx = interpolated.x.findIndex((x, k) => 
+                        Math.abs(x - xRange[j]) < 1e-6 && Math.abs(interpolated.y[k] - yRange[i]) < 1e-6);
+                    row.push(idx >= 0 ? interpolated.z[idx] : null);
+                }
+                zGrid.push(row);
+            }
+            
+            const traces = [
+                {
+                    type: 'contour',
+                    x: xRange,
+                    y: yRange,
+                    z: zGrid,
+                    colorscale: 'RdBu',
+                    reversescale: true,
+                    showscale: false,
+                    contours: {
+                        coloring: 'fill',
+                        showlines: true,
+                        line: { color: 'rgba(0,0,0,0.1)', width: 0.5 }
+                    },
+                    hoverinfo: 'skip'
+                },
+                // Head outline
+                {
+                    type: 'scatter',
+                    x: headOutline.head.x,
+                    y: headOutline.head.y,
+                    mode: 'lines',
+                    line: { color: 'black', width: 2.5 },
+                    showlegend: false,
+                    hoverinfo: 'skip'
+                },
+                // Nose
+                {
+                    type: 'scatter',
+                    x: headOutline.nose.x,
+                    y: headOutline.nose.y,
+                    mode: 'lines',
+                    line: { color: 'black', width: 2.5 },
+                    fill: 'toself',
+                    fillcolor: 'black',
+                    showlegend: false,
+                    hoverinfo: 'skip'
+                },
+                // Ears
+                {
+                    type: 'scatter',
+                    x: headOutline.leftEar.x,
+                    y: headOutline.leftEar.y,
+                    mode: 'lines',
+                    line: { color: 'black', width: 2.5 },
+                    showlegend: false,
+                    hoverinfo: 'skip'
+                },
+                {
+                    type: 'scatter',
+                    x: headOutline.rightEar.x,
+                    y: headOutline.rightEar.y,
+                    mode: 'lines',
+                    line: { color: 'black', width: 2.5 },
+                    showlegend: false,
+                    hoverinfo: 'skip'
+                }
+            ];
+            
+            const layout = {
+                title: {
+                    text: bandName,
+                    font: { size: 14 }
+                },
+                xaxis: { 
+                    visible: false, 
+                    range: [-0.12, 0.12],
+                    scaleanchor: 'y',
+                    scaleratio: 1,
+                    fixedrange: true
+                },
+                yaxis: { 
+                    visible: false, 
+                    range: [-0.12, 0.12],
+                    fixedrange: true
+                },
+                showlegend: false,
+                margin: { l: 10, r: 10, t: 30, b: 10 },
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white'
+            };
+            
+            // Create plot and handle responsiveness
+            await Plotly.newPlot(plotDiv.id, traces, layout, {
+                displayModeBar: false, 
+                responsive: true,
+                staticPlot: false
+            });
+            
+            // Add resize observer for individual topomap
+            if (window.ResizeObserver) {
+                const resizeObserver = new ResizeObserver(() => {
+                    Plotly.Plots.resize(plotDiv.id);
+                });
+                resizeObserver.observe(plotDiv);
+            }
+        }
+        
+    } catch (error) {
+        alert(`Topomaps generation failed: ${error.message}`);
+        isTransitioning = false;
     }
-  }
 }
 
-function getSelectedChannels() {
-  return Array.from(
-    document.querySelectorAll("#channelList input:checked")
-  ).map((cb) => cb.value);
+// Updated showBandTopomaps function with better state management
+function showBandTopomaps() {
+  // Prevent action if not in PSD mode
+  if (!psdVisible) return;
+  
+  // Prevent rapid clicking
+  if (isTransitioning) return;
+  isTransitioning = true;
+
+  const multiTopomapContainer = document.getElementById("multiTopomapContainer");
+  const mainContainer = document.getElementById("main");
+  const topomapBtn = document.getElementById("topomapMultiBtn");
+  
+  // Toggle topomap visibility
+  if (topomapsVisible) {
+    // Hide topomaps
+    multiTopomapContainer.style.display = "none";
+    mainContainer.classList.remove("psd-with-topomaps");
+    if (topomapBtn) topomapBtn.textContent = "Show Band Topomaps";
+    topomapsVisible = false;
+  } else {
+    // Show topomaps
+    if (topomapBtn) topomapBtn.textContent = "Hide Topomaps";
+    topomapsVisible = true;
+    generateBandTopomaps();
+  }
+  
+  // Allow new transitions
+  setTimeout(() => {
+    isTransitioning = false;
+  }, 100);
 }
 
 function showError(message) {
-  const plotDiv = document.getElementById("plot");
-  plotDiv.innerHTML = `<div class="error-container"><h3>Error</h3><p>${message}</p></div>`;
+  const errorDiv = document.getElementById("error");
+  if (errorDiv) {
+    errorDiv.textContent = message;
+    errorDiv.style.display = "block";
+  } else {
+    console.error("Error:", message);
+  }
 }

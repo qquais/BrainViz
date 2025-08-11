@@ -17,12 +17,14 @@
 * **Stacked & Compact Modes**: Choose between clinical-style or overlay visualization
 * **Filtering Tools**: Apply bandpass, lowpass, highpass, or notch filters (50Hz/60Hz)
 * **Real-Time Time Slider**: Navigate large EEG datasets with a draggable canvas-based slider
+* **Python-Powered Filtering**: Uses Pyodide with SciPy for advanced signal processing
 
 ### 🎵 Frequency Analysis
 
 * **Power Spectral Density (PSD)**: Generate PSD plots to observe signal frequency patterns
 * **Channel-wise PSD**: Analyze frequency band activity per selected channel
 * **Overlay Comparison**: Preview multiple channel spectra
+* **Band Topomaps**: Visualize Delta, Theta, Alpha, and Beta frequency bands as brain topographic maps
 
 ### 📁 File Management
 
@@ -63,11 +65,13 @@ cd brainviz
   * Select channels
   * Apply filters
   * Toggle PSD or stacked mode
+  * Toggle Topomap on PSD Screen
 
 ### 3. Analyze the Signal
 
 * Use the slider to scroll across the EEG timeline
 * Click "Show PSD" for frequency analysis
+* View brain topomaps for different frequency bands
 * Export results or view channel overlays
 
 ## Viewer Functions
@@ -94,50 +98,38 @@ cd brainviz
 
 ```
 BrainViz/
-├── flask-server/                   # Backend Flask server (MCP server)
-│   └── mcp_server.py              # Flask app for EEG processing via MNE
-│   └── requirements.txt           # Python dependencies
+├── icons/                         # Extension icons
+│   ├── Brainviz16.png
+│   ├── Brainviz48.png
+│   └── Brainviz128.png
 │
-├── public/                        # Chrome extension frontend
-│   ├── icons/                     # Extension icons (16x16, 48x48, 128x128)
-│   │   ├── Brainviz16.png
-│   │   ├── Brainviz48.png
-│   │   └── Brainviz128.png
-│   │
-│   ├── libs/                      # JS libraries (e.g., Plotly)
-│   │   └── plotly.min.js
-│   │
-│   ├── background.js              # Service worker (background logic)
-│   ├── contentScript.js          # Injected into pages to enable EEG view
-│   ├── eegStorage.js             # Handles file storage and transfer
-│   ├── index.html                # Extension popup UI
-│   ├── manifest.json             # Extension configuration (Manifest v3)
-│   ├── popup.js                  # Logic for popup panel
-│   ├── scriptInjector.js         # Injects scripts into tab
-│   ├── viewer.html               # EEG viewer interface
-│   └── viewer.js                 # EEG signal rendering logic
+├── libs/                          # JavaScript libraries and Python packages
+│   ├── EdfDecoder.js              # EDF file decoder
+│   ├── jsEDF.js                   # JavaScript EDF parser
+│   ├── plotly.min.js              # Plotly.js for data visualization
+│   ├── pyodide.js                 # Python in the browser runtime
+│   ├── pyodide.asm.js             # Pyodide WebAssembly interface
+│   ├── pyodide.asm.wasm           # Pyodide WebAssembly binary
+│   ├── pyodide-lock.json          # Pyodide package lock file
+│   ├── python_stdlib.zip          # Python standard library
+│   ├── numpy-1.26.4-cp311-cp311-emscripten_3_1_46_wasm32.whl  # NumPy for signal processing
+│   ├── scipy-1.11.2-cp311-cp311-emscripten_3_1_46_wasm32.whl  # SciPy for filtering
+│   └── openblas-0.3.23.zip        # Linear algebra library
 │
+├── background.js                 # Service worker (background logic)
+├── contentScript.js              # Injected into pages to enable EEG detection
+├── eegStorage.js                 # Handles large file storage using IndexedDB
+├── index.html                    # Extension popup UI
+├── manifest.json                 # Extension configuration (Manifest v3)
+├── popup.js                      # Logic for popup panel and file upload
+├── scriptInjector.js             # Injects scripts into web pages for EEG detection
+├── viewer.html                   # EEG viewer interface
+├── viewer.js                     # EEG signal rendering and analysis logic
 ├── privacy-policy.md             # Privacy policy for Chrome Web Store
 └── README.md                     # Project documentation
 ```
 
-## Backend Server
-
-BrainViz connects to a Flask-based **MCP server** hosted at:
-
-```
-https://brainviz.opensource.mieweb.org
-```
-
-This server (via `mcp_server.py`) performs EEG preprocessing:
-
-* Filter application
-* PSD calculation
-* Channel data extraction
-
 ## ⚠️ Known Issues
-
-- Uploads were failing due to NGINX's default client_max_body_size (1MB). Fixed by increasing it to 150M to support larger EEG files.
 
 - Interception may fail if page disables content scripts or uses custom download logic.
 
@@ -149,13 +141,14 @@ This server (via `mcp_server.py`) performs EEG preprocessing:
 | Viewer shows "No Data"      | Make sure your file has valid headers and numeric rows              |
 | Content not displaying      | File may be HTML or invalid EEG data (check devtools/network tab)   |
 | Not working on some pages   | Some domains restrict extension scripts (e.g. chrome:// or sandboxed pages) |
-
+| Python engine not ready     | Wait a few seconds for Pyodide to initialize before using filters   |
+| Topomaps not showing   | Ensure at least 3 channels are selected and mappable to electrode positions |
 
 ## Development
 
 ### Build
 
-No npm build step required. This is a vanilla JS/HTML/CSS extension using Chrome Extension Manifest V3.
+No npm build step required. This is a vanilla JS/HTML/CSS extension using Chrome Extension Manifest V3 with Pyodide for Python functionality.
 
 To test changes:
 
@@ -170,7 +163,7 @@ To test changes:
 
 ## Privacy Policy
 
-This extension processes EEG files locally in your browser and communicates only with the BrainViz MCP server to perform signal processing. No user-identifiable data is collected, transmitted, or stored.
+This extension processes EEG files locally in your browser using client-side Python via Pyodide. No user-identifiable data is collected, transmitted, or stored on external servers. All signal processing happens entirely within your browser.
 
 ## Support & Contributions
 
@@ -180,9 +173,29 @@ This extension processes EEG files locally in your browser and communicates only
 ## Acknowledgments
 
 * Supported by [MIE](https://mieweb.org/)
-* Uses [MNE-Python](https://mne.tools/stable/index.html) (via backend)
-* EEG dataset support tested on [PhysioNet](https://physionet.org/)
-* Powered by [Plotly.js](https://plotly.com/javascript/)
+* JavaScript Libraries:
+
+  * [Plotly.js](https://plotly.com/javascript/)- Interactive data visualization
+  * jsEDF.js - JavaScript EDF file parser
+  * EdfDecoder.js - Additional EDF decoding capabilities
+
+* Python in Browser:
+
+  * Pyodide - Python scientific stack in WebAssembly
+  * NumPy - Numerical computing for signal processing
+  * SciPy - Scientific computing and signal filtering
+  * OpenBLAS - Optimized linear algebra library
+
+* EEG Dataset Support:
+
+  * Testing with [PhysioNet](https://physionet.org/) datasets
+  * 10-20 International System electrode positioning
+
+* Browser APIs:
+
+  * Chrome Extension APIs (Storage, Downloads, Tabs)
+  * IndexedDB for large file handling
+  * Web Workers for background processing
 
 ## Project Demo
 
@@ -190,8 +203,10 @@ This extension processes EEG files locally in your browser and communicates only
 
 ---
 
-**Version**: 1.0.0
+**Version**: 1.0.1
 
 **Manifest**: v3
 
 **Minimum Chrome Version**: 88+
+
+**Python Runtime**: Pyodide (client-side)
