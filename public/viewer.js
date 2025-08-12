@@ -431,7 +431,7 @@ function forceTopoloMapHide() {
   topomapsVisible = false;
 }
 
-// Updated handlePsdToggle function with better state management
+// handlePsdToggle function with better state management
 async function handlePsdToggle() {
   // Prevent rapid clicking
   if (isTransitioning) return;
@@ -976,201 +976,302 @@ function createHeadOutline() {
     };
 }
 
-// Updated generateBandTopomaps to properly set state
+// generateBandTopomaps with matching colors and responsive color bar
 async function generateBandTopomaps() {
-    if (!pythonReady) {
-        alert("Python engine not ready yet");
-        isTransitioning = false;
-        return;
+  if (!pythonReady) {
+    alert("Python engine not ready yet");
+    isTransitioning = false;
+    return;
+  }
+
+  const selectedChannels = getSelectedChannels();
+  if (selectedChannels.length < 3) {
+    alert("Need at least 3 channels for topomap");
+    isTransitioning = false;
+    return;
+  }
+
+  const channelMapping = mapChannelsToElectrodes(selectedChannels);
+  const mappedChannels = Object.keys(channelMapping);
+
+  if (mappedChannels.length < 3) {
+    alert(
+      `Only ${mappedChannels.length} channels could be mapped to electrode positions. Need at least 3.`
+    );
+    isTransitioning = false;
+    return;
+  }
+
+  try {
+    const selectedIndices = mappedChannels.map((ch) =>
+      eegData.channel_names.indexOf(ch)
+    );
+    const selectedSignals = selectedIndices.map((i) => eegData.signals[i]);
+    const { freqs, psd } = await computePSDInBrowser(
+      selectedSignals,
+      sampleRate
+    );
+
+    const multiTopomapContainer = document.getElementById(
+      "multiTopomapContainer"
+    );
+    const mainContainer = document.getElementById("main");
+
+    multiTopomapContainer.innerHTML = "";
+    multiTopomapContainer.style.display = "block";
+
+    // Add coordinated layout class if in PSD mode
+    if (psdVisible) {
+      mainContainer.classList.add("psd-with-topomaps");
     }
-    
-    const selectedChannels = getSelectedChannels();
-    if (selectedChannels.length < 3) {
-        alert("Need at least 3 channels for topomap");
-        isTransitioning = false;
-        return;
-    }
-    
-    const channelMapping = mapChannelsToElectrodes(selectedChannels);
-    const mappedChannels = Object.keys(channelMapping);
-    
-    if (mappedChannels.length < 3) {
-        alert(`Only ${mappedChannels.length} channels could be mapped to electrode positions. Need at least 3.`);
-        isTransitioning = false;
-        return;
-    }
-    
-    try {
-        const selectedIndices = mappedChannels.map(ch => eegData.channel_names.indexOf(ch));
-        const selectedSignals = selectedIndices.map(i => eegData.signals[i]);
-        const { freqs, psd } = await computePSDInBrowser(selectedSignals, sampleRate);
-        
-        const multiTopomapContainer = document.getElementById("multiTopomapContainer");
-        const mainContainer = document.getElementById("main");
-        
-        multiTopomapContainer.innerHTML = "";
-        multiTopomapContainer.style.display = "block";
-        
-        // Add coordinated layout class if in PSD mode
-        if (psdVisible) {
-            mainContainer.classList.add("psd-with-topomaps");
+
+    // Create responsive container using CSS classes
+    const topomapsWrapper = document.createElement("div");
+    topomapsWrapper.className = "topomaps-wrapper";
+    multiTopomapContainer.appendChild(topomapsWrapper);
+
+    // Create color bar container with matching RdBu colors and responsive design
+    const colorBarContainer = document.createElement("div");
+    colorBarContainer.style.cssText = `
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 160px;
+background: linear-gradient(to top, 
+    #053061 0%,
+    #2166ac 16%,
+    #4393c3 32%,
+    #92c5de 48%,
+    #d1e5f0 64%,
+    #f7f7f7 80%,
+    #fdbf6f 88%,
+    #d73027 94%,
+    #a50026 100%
+);
+    border: 1px solid #333;
+    border-radius: 3px;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+`;
+
+    // Add +/- labels with better positioning
+    const plusLabel = document.createElement("div");
+    plusLabel.textContent = "+";
+    plusLabel.style.cssText = `
+            position: absolute;
+            right: -12px;
+            top: -8px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+        `;
+
+    const minusLabel = document.createElement("div");
+    minusLabel.textContent = "-";
+    minusLabel.style.cssText = `
+            position: absolute;
+            right: -12px;
+            bottom: -8px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+        `;
+
+    colorBarContainer.appendChild(plusLabel);
+    colorBarContainer.appendChild(minusLabel);
+
+    // Make container relative for absolute positioning and handle overflow
+    multiTopomapContainer.style.position = "relative";
+    multiTopomapContainer.style.overflow = "visible"; // Allow color bar to show
+    multiTopomapContainer.appendChild(colorBarContainer);
+
+    // Add responsive behavior for color bar
+    const updateColorBarSize = () => {
+      const containerWidth = multiTopomapContainer.offsetWidth;
+      if (containerWidth < 600) {
+        colorBarContainer.style.width = "12px";
+        colorBarContainer.style.height = "120px";
+        colorBarContainer.style.right = "5px";
+        plusLabel.style.fontSize = "12px";
+        minusLabel.style.fontSize = "12px";
+        plusLabel.style.right = "-10px";
+        minusLabel.style.right = "-10px";
+      } else {
+        colorBarContainer.style.width = "18px";
+        colorBarContainer.style.height = "160px";
+        colorBarContainer.style.right = "10px";
+        plusLabel.style.fontSize = "16px";
+        minusLabel.style.fontSize = "16px";
+        plusLabel.style.right = "-12px";
+        minusLabel.style.right = "-12px";
+      }
+    };
+
+    updateColorBarSize();
+    window.addEventListener("resize", updateColorBarSize);
+
+    for (const [bandName, [lowFreq, highFreq]] of Object.entries(
+      FREQUENCY_BANDS
+    )) {
+      // Calculate average power in frequency range
+      const freqMask = freqs.map((f) => f >= lowFreq && f <= highFreq);
+      const bandPower = psd.map((spectrum) => {
+        const bandValues = spectrum.filter((_, i) => freqMask[i]);
+        return bandValues.reduce((a, b) => a + b, 0) / bandValues.length;
+      });
+
+      // Get electrode positions
+      const electrodePositions = [];
+      for (let i = 0; i < mappedChannels.length; i++) {
+        const standardName = channelMapping[mappedChannels[i]];
+        const [x, y, z] = ELECTRODE_POSITIONS[standardName];
+        electrodePositions.push([x, y]);
+      }
+
+      // Create individual topomap container using CSS classes
+      const bandContainer = document.createElement("div");
+      bandContainer.className = "band-container";
+
+      const plotDiv = document.createElement("div");
+      plotDiv.id = `topomap_${bandName.split(" ")[0]}`;
+      plotDiv.className = "topomap-plot";
+      bandContainer.appendChild(plotDiv);
+
+      topomapsWrapper.appendChild(bandContainer);
+
+      // Generate topomap for this frequency range
+      const interpolated = interpolateTopomap(
+        electrodePositions,
+        bandPower,
+        50
+      );
+      const headOutline = createHeadOutline();
+
+      const xRange = Array.from(new Set(interpolated.x)).sort((a, b) => a - b);
+      const yRange = Array.from(new Set(interpolated.y)).sort((a, b) => a - b);
+
+      const zGrid = [];
+      for (let i = 0; i < yRange.length; i++) {
+        const row = [];
+        for (let j = 0; j < xRange.length; j++) {
+          const idx = interpolated.x.findIndex(
+            (x, k) =>
+              Math.abs(x - xRange[j]) < 1e-6 &&
+              Math.abs(interpolated.y[k] - yRange[i]) < 1e-6
+          );
+          row.push(idx >= 0 ? interpolated.z[idx] : null);
         }
-        
-        // Create responsive container using CSS classes
-        const topomapsWrapper = document.createElement("div");
-        topomapsWrapper.className = "topomaps-wrapper";
-        multiTopomapContainer.appendChild(topomapsWrapper);
-        
-        for (const [bandName, [lowFreq, highFreq]] of Object.entries(FREQUENCY_BANDS)) {
-            // Calculate average power in frequency range
-            const freqMask = freqs.map(f => f >= lowFreq && f <= highFreq);
-            const bandPower = psd.map(spectrum => {
-                const bandValues = spectrum.filter((_, i) => freqMask[i]);
-                return bandValues.reduce((a, b) => a + b, 0) / bandValues.length;
-            });
-            
-            // Get electrode positions
-            const electrodePositions = [];
-            for (let i = 0; i < mappedChannels.length; i++) {
-                const standardName = channelMapping[mappedChannels[i]];
-                const [x, y, z] = ELECTRODE_POSITIONS[standardName];
-                electrodePositions.push([x, y]);
-            }
-            
-            // Create individual topomap container using CSS classes
-            const bandContainer = document.createElement("div");
-            bandContainer.className = "band-container";
-            
-            const plotDiv = document.createElement("div");
-            plotDiv.id = `topomap_${bandName.split(' ')[0]}`;
-            plotDiv.className = "topomap-plot";
-            bandContainer.appendChild(plotDiv);
-            
-            topomapsWrapper.appendChild(bandContainer);
-            
-            // Generate topomap for this frequency range
-            const interpolated = interpolateTopomap(electrodePositions, bandPower, 50);
-            const headOutline = createHeadOutline();
-            
-            const xRange = Array.from(new Set(interpolated.x)).sort((a, b) => a - b);
-            const yRange = Array.from(new Set(interpolated.y)).sort((a, b) => a - b);
-            
-            const zGrid = [];
-            for (let i = 0; i < yRange.length; i++) {
-                const row = [];
-                for (let j = 0; j < xRange.length; j++) {
-                    const idx = interpolated.x.findIndex((x, k) => 
-                        Math.abs(x - xRange[j]) < 1e-6 && Math.abs(interpolated.y[k] - yRange[i]) < 1e-6);
-                    row.push(idx >= 0 ? interpolated.z[idx] : null);
-                }
-                zGrid.push(row);
-            }
-            
-            const traces = [
-                {
-                    type: 'contour',
-                    x: xRange,
-                    y: yRange,
-                    z: zGrid,
-                    colorscale: 'RdBu',
-                    reversescale: true,
-                    showscale: false,
-                    contours: {
-                        coloring: 'fill',
-                        showlines: true,
-                        line: { color: 'rgba(0,0,0,0.1)', width: 0.5 }
-                    },
-                    hoverinfo: 'skip'
-                },
-                // Head outline
-                {
-                    type: 'scatter',
-                    x: headOutline.head.x,
-                    y: headOutline.head.y,
-                    mode: 'lines',
-                    line: { color: 'black', width: 2.5 },
-                    showlegend: false,
-                    hoverinfo: 'skip'
-                },
-                // Nose
-                {
-                    type: 'scatter',
-                    x: headOutline.nose.x,
-                    y: headOutline.nose.y,
-                    mode: 'lines',
-                    line: { color: 'black', width: 2.5 },
-                    fill: 'toself',
-                    fillcolor: 'black',
-                    showlegend: false,
-                    hoverinfo: 'skip'
-                },
-                // Ears
-                {
-                    type: 'scatter',
-                    x: headOutline.leftEar.x,
-                    y: headOutline.leftEar.y,
-                    mode: 'lines',
-                    line: { color: 'black', width: 2.5 },
-                    showlegend: false,
-                    hoverinfo: 'skip'
-                },
-                {
-                    type: 'scatter',
-                    x: headOutline.rightEar.x,
-                    y: headOutline.rightEar.y,
-                    mode: 'lines',
-                    line: { color: 'black', width: 2.5 },
-                    showlegend: false,
-                    hoverinfo: 'skip'
-                }
-            ];
-            
-            const layout = {
-                title: {
-                    text: bandName,
-                    font: { size: 14 }
-                },
-                xaxis: { 
-                    visible: false, 
-                    range: [-0.12, 0.12],
-                    scaleanchor: 'y',
-                    scaleratio: 1,
-                    fixedrange: true
-                },
-                yaxis: { 
-                    visible: false, 
-                    range: [-0.12, 0.12],
-                    fixedrange: true
-                },
-                showlegend: false,
-                margin: { l: 10, r: 10, t: 30, b: 10 },
-                plot_bgcolor: 'white',
-                paper_bgcolor: 'white'
-            };
-            
-            // Create plot and handle responsiveness
-            await Plotly.newPlot(plotDiv.id, traces, layout, {
-                displayModeBar: false, 
-                responsive: true,
-                staticPlot: false
-            });
-            
-            // Add resize observer for individual topomap
-            if (window.ResizeObserver) {
-                const resizeObserver = new ResizeObserver(() => {
-                    Plotly.Plots.resize(plotDiv.id);
-                });
-                resizeObserver.observe(plotDiv);
-            }
-        }
-        
-    } catch (error) {
-        alert(`Topomaps generation failed: ${error.message}`);
-        isTransitioning = false;
+        zGrid.push(row);
+      }
+
+      const traces = [
+        {
+          type: "contour",
+          x: xRange,
+          y: yRange,
+          z: zGrid,
+          colorscale: "RdBu",
+          reversescale: true,
+          showscale: false, // No individual color bars
+          contours: {
+            coloring: "fill",
+            showlines: true,
+            line: { color: "rgba(0,0,0,0.1)", width: 0.5 },
+          },
+          hoverinfo: "skip",
+        },
+        // Head outline
+        {
+          type: "scatter",
+          x: headOutline.head.x,
+          y: headOutline.head.y,
+          mode: "lines",
+          line: { color: "black", width: 2.5 },
+          showlegend: false,
+          hoverinfo: "skip",
+        },
+        // Nose
+        {
+          type: "scatter",
+          x: headOutline.nose.x,
+          y: headOutline.nose.y,
+          mode: "lines",
+          line: { color: "black", width: 2.5 },
+          fill: "toself",
+          fillcolor: "black",
+          showlegend: false,
+          hoverinfo: "skip",
+        },
+        // Ears
+        {
+          type: "scatter",
+          x: headOutline.leftEar.x,
+          y: headOutline.leftEar.y,
+          mode: "lines",
+          line: { color: "black", width: 2.5 },
+          showlegend: false,
+          hoverinfo: "skip",
+        },
+        {
+          type: "scatter",
+          x: headOutline.rightEar.x,
+          y: headOutline.rightEar.y,
+          mode: "lines",
+          line: { color: "black", width: 2.5 },
+          showlegend: false,
+          hoverinfo: "skip",
+        },
+      ];
+
+      const layout = {
+        title: {
+          text: bandName,
+          font: { size: 14 },
+        },
+        xaxis: {
+          visible: false,
+          range: [-0.12, 0.12],
+          scaleanchor: "y",
+          scaleratio: 1,
+          fixedrange: true,
+        },
+        yaxis: {
+          visible: false,
+          range: [-0.12, 0.12],
+          fixedrange: true,
+        },
+        showlegend: false,
+        margin: { l: 10, r: 10, t: 30, b: 10 },
+        plot_bgcolor: "white",
+        paper_bgcolor: "white",
+      };
+
+      // Create plot and handle responsiveness
+      await Plotly.newPlot(plotDiv.id, traces, layout, {
+        displayModeBar: false,
+        responsive: true,
+        staticPlot: false,
+      });
+
+      // Add resize observer for individual topomap
+      if (window.ResizeObserver) {
+        const resizeObserver = new ResizeObserver(() => {
+          Plotly.Plots.resize(plotDiv.id);
+        });
+        resizeObserver.observe(plotDiv);
+      }
     }
+  } catch (error) {
+    alert(`Topomaps generation failed: ${error.message}`);
+    isTransitioning = false;
+  }
 }
 
-// Updated showBandTopomaps function with better state management
+// showBandTopomaps function with better state management
 function showBandTopomaps() {
   // Prevent action if not in PSD mode
   if (!psdVisible) return;
