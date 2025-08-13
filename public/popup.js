@@ -43,9 +43,9 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     try {
       if (fileName.endsWith(".edf")) {
-        await handleEDFFileSimple(file);
+        await handleEDFFileWithValidation(file);
       } else {
-        await handleTextFileSimple(file);
+        await handleTextFileWithValidation(file);
       }
     } catch (error) {
       console.error("File processing error:", error);
@@ -55,41 +55,159 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
   });
 
-  async function handleEDFFileSimple(file) {
-    console.log("Processing EDF file (simple method):", file.name);
+  // EDF validation function
+  function isValidEEGBuffer(buffer) {
+    try {
+      const header = new TextDecoder().decode(buffer.slice(0, 256));
+      const ns = parseInt(header.slice(252, 256).trim());
+      if (isNaN(ns) || ns <= 0) return false;
+
+      const signalLabelsRaw = buffer.slice(256, 256 + ns * 16);
+      const signalLabels = new TextDecoder()
+        .decode(signalLabelsRaw)
+        .toLowerCase();
+
+      const eegKeywords = [
+        "eeg",
+        "fp1",
+        "fp2",
+        "fz",
+        "cz",
+        "pz",
+        "oz",
+        "f3",
+        "f4",
+        "c3",
+        "c4",
+        "p3",
+        "p4",
+        "o1",
+        "o2",
+        "t3",
+        "t4",
+        "t5",
+        "t6",
+      ];
+      const nonEEGKeywords = ["emg", "ecg", "eog", "abdomen", "direct"];
+
+      const hasEEG = eegKeywords.some((k) => signalLabels.includes(k));
+      const isLikelyNotEEG = nonEEGKeywords.some((k) =>
+        signalLabels.includes(k)
+      );
+
+      return hasEEG && !isLikelyNotEEG;
+    } catch (e) {
+      console.error("Error in EDF EEG detection:", e);
+      return false;
+    }
+  }
+
+  // Text validation function
+  function isValidEEGText(text) {
+    const lower = text.toLowerCase();
+    if (lower.includes("<html") || lower.includes("<!doctype")) return false;
+
+    const lines = text.split("\n").filter((line) => line.trim().length > 0);
+    if (lines.length < 10) return false;
+
+    const avgLineLen =
+      lines.reduce((sum, line) => sum + line.length, 0) / lines.length;
+    if (avgLineLen < 10) return false;
+
+    const numericRatio = (text.match(/[-\d\.]/g) || []).length / text.length;
+    if (numericRatio < 0.2) return false;
+
+    return containsEEGKeywords(text);
+  }
+
+  function containsEEGKeywords(text) {
+    const lower = text.toLowerCase();
+    const eegKeywords = [
+      "eeg",
+      "exg",
+      "fp1",
+      "fp2",
+      "fz",
+      "cz",
+      "pz",
+      "oz",
+      "t3",
+      "t4",
+      "t5",
+      "t6",
+      "channel",
+      "sample_rate",
+      "electrode",
+    ];
+    return eegKeywords.some((keyword) => lower.includes(keyword));
+  }
+
+  // EDF handler with validation
+  async function handleEDFFileWithValidation(file) {
+    console.log("Processing EDF file with validation:", file.name);
 
     try {
       const arrayBuffer = await file.arrayBuffer();
       console.log("File read complete, buffer size:", arrayBuffer.byteLength);
 
-      // Ensure both storage layers are cleared
+      // Validate if this is actually an EEG file
+      const validationResult = isValidEEGBuffer(arrayBuffer);
+
+      if (!validationResult) {
+        // Handle validation
+        console.log("EDF validation failed: File does not contain EEG data");
+
+        // Show user-friendly message
+        alert(`This EDF file doesn't appear to contain EEG data.
+It may be ECG, EMG, or other physiological data.
+The viewer is specifically designed for EEG signals.`);
+
+        return; // Exit without throwing error in console
+      }
+
+      // Clear both storage layers
       await chrome.storage.local.clear();
       console.log("Cleared chrome.storage.local");
 
       if (eegStorage) {
-        await eegStorage.clearAllData(); // This clears IndexedDB
+        await eegStorage.clearAllData();
         await eegStorage.storeEDFFile(arrayBuffer, file.name);
-        console.log("Stored new EDF in IndexedDB");
+        console.log("Stored validated EDF in IndexedDB");
       }
 
-      console.log("EDF data stored, opening viewer...");
-
-      // Small delay to ensure storage is complete
+      console.log("EEG EDF data stored, opening viewer...");
       setTimeout(() => {
         chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
       }, 100);
     } catch (error) {
-      console.error("EDF processing failed:", error);
-      throw new Error(`EDF processing failed: ${error.message}`);
+      // Only log actual technical errors, not validation failures
+      console.error("Technical error processing EDF file:", error);
+      alert("Technical error processing file: " + error.message);
     }
   }
 
-  async function handleTextFileSimple(file) {
-    console.log("Processing text file:", file.name);
+  // exit handler with validation
+  async function handleTextFileWithValidation(file) {
+    console.log("Processing text file with validation:", file.name);
 
     try {
       const text = await file.text();
       console.log("Text read complete, length:", text.length);
+
+      // Validate if this is actually an EEG file
+      const validationResult = isValidEEGText(text);
+
+      if (!validationResult) {
+        // Handle validation failure
+        console.log("Text validation failed: File does not contain EEG data");
+
+        // Show user-friendly message
+        alert(`This text file doesn't appear to contain EEG data.
+Please ensure your file contains EEG channel data with appropriate headers
+(like EEG, FP1, FZ, CZ, etc.) and numeric signal values.`);
+
+        return; // Exit without throwing console error
+      }
 
       // Clear all previous data
       await chrome.storage.local.clear();
@@ -98,13 +216,14 @@ document.addEventListener("DOMContentLoaded", async function () {
         await eegStorage.storeTextFile(text, file.name);
       }
 
-      console.log("Text EEG stored, opening viewer...");
+      console.log("Validated EEG text stored, opening viewer...");
       setTimeout(() => {
         chrome.tabs.create({ url: chrome.runtime.getURL("viewer.html") });
       }, 100);
     } catch (error) {
-      console.error("Text processing failed:", error);
-      throw new Error(`Text processing failed: ${error.message}`);
+      // Only log actual technical errors, not validation failures
+      console.error("Technical error processing text file:", error);
+      alert("Technical error processing file: " + error.message);
     }
   }
 
@@ -155,6 +274,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       }
     });
   }
+
   const interceptToggle = document.getElementById("interceptToggle");
   const interceptStatus = document.getElementById("interceptStatus");
 
