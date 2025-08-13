@@ -17,31 +17,76 @@ let topomapsVisible = false; // Track topomap state
 
 // Electrode positions (10-20 system)
 const ELECTRODE_POSITIONS = {
-    'FP1': [-0.06, 0.08, 0.05], 'FP2': [0.06, 0.08, 0.05], 'FPZ': [0.0, 0.08, 0.05],
-    'AF3': [-0.04, 0.07, 0.05], 'AF4': [0.04, 0.07, 0.05], 'AFZ': [0.0, 0.07, 0.05],
-    'F7': [-0.08, 0.03, 0.02], 'F3': [-0.05, 0.05, 0.04], 'FZ': [0.0, 0.05, 0.06],
-    'F4': [0.05, 0.05, 0.04], 'F8': [0.08, 0.03, 0.02],
-    'FC5': [-0.07, 0.02, 0.03], 'FC3': [-0.04, 0.03, 0.05], 'FC1': [-0.03, 0.02, 0.05],
-    'FCZ': [0.0, 0.02, 0.06], 'FC2': [0.03, 0.02, 0.05], 'FC4': [0.04, 0.03, 0.05], 'FC6': [0.07, 0.02, 0.03],
-    'T7': [-0.08, 0.0, 0.0], 'C5': [-0.07, 0.0, 0.02], 'C3': [-0.05, 0.0, 0.04], 'C1': [-0.025, 0.0, 0.05],
-    'CZ': [0.0, 0.0, 0.06], 'C2': [0.025, 0.0, 0.05], 'C4': [0.05, 0.0, 0.04], 'C6': [0.07, 0.0, 0.02], 'T8': [0.08, 0.0, 0.0],
-    'CP5': [-0.07, -0.02, 0.03], 'CP3': [-0.04, -0.03, 0.05], 'CP1': [-0.03, -0.02, 0.05],
-    'CPZ': [0.0, -0.02, 0.06], 'CP2': [0.03, -0.02, 0.05], 'CP4': [0.04, -0.03, 0.05], 'CP6': [0.07, -0.02, 0.03],
-    'P7': [-0.08, -0.03, 0.02], 'P5': [-0.06, -0.04, 0.03], 'P3': [-0.05, -0.05, 0.04], 'P1': [-0.03, -0.06, 0.05],
-    'PZ': [0.0, -0.05, 0.06], 'P2': [0.03, -0.06, 0.05], 'P4': [0.05, -0.05, 0.04], 'P6': [0.06, -0.04, 0.03], 'P8': [0.08, -0.03, 0.02],
-    'PO7': [-0.06, -0.06, 0.02], 'PO3': [-0.04, -0.07, 0.03], 'POZ': [0.0, -0.07, 0.05], 'PO4': [0.04, -0.07, 0.03], 'PO8': [0.06, -0.06, 0.02],
-    'O1': [-0.03, -0.08, 0.02], 'OZ': [0.0, -0.08, 0.04], 'O2': [0.03, -0.08, 0.02], 'IZ': [0.0, -0.09, 0.01],
-    'T3': [-0.08, 0.0, 0.0], 'T4': [0.08, 0.0, 0.0], 'T5': [-0.08, -0.03, 0.02], 'T6': [0.08, -0.03, 0.02],
-    'FT7': [-0.08, 0.02, 0.01], 'FT8': [0.08, 0.02, 0.01], 'FT9': [-0.09, 0.01, 0.01], 'FT10': [0.09, 0.01, 0.01],
-    'TP7': [-0.08, -0.02, 0.01], 'TP8': [0.08, -0.02, 0.01],
+  FP1: [-0.06, 0.08, 0.05],
+  FP2: [0.06, 0.08, 0.05],
+  FPZ: [0.0, 0.08, 0.05],
+  AF3: [-0.04, 0.07, 0.05],
+  AF4: [0.04, 0.07, 0.05],
+  AFZ: [0.0, 0.07, 0.05],
+  F7: [-0.08, 0.03, 0.02],
+  F3: [-0.05, 0.05, 0.04],
+  FZ: [0.0, 0.05, 0.06],
+  F4: [0.05, 0.05, 0.04],
+  F8: [0.08, 0.03, 0.02],
+  FC5: [-0.07, 0.02, 0.03],
+  FC3: [-0.04, 0.03, 0.05],
+  FC1: [-0.03, 0.02, 0.05],
+  FCZ: [0.0, 0.02, 0.06],
+  FC2: [0.03, 0.02, 0.05],
+  FC4: [0.04, 0.03, 0.05],
+  FC6: [0.07, 0.02, 0.03],
+  T7: [-0.08, 0.0, 0.0],
+  C5: [-0.07, 0.0, 0.02],
+  C3: [-0.05, 0.0, 0.04],
+  C1: [-0.025, 0.0, 0.05],
+  CZ: [0.0, 0.0, 0.06],
+  C2: [0.025, 0.0, 0.05],
+  C4: [0.05, 0.0, 0.04],
+  C6: [0.07, 0.0, 0.02],
+  T8: [0.08, 0.0, 0.0],
+  CP5: [-0.07, -0.02, 0.03],
+  CP3: [-0.04, -0.03, 0.05],
+  CP1: [-0.03, -0.02, 0.05],
+  CPZ: [0.0, -0.02, 0.06],
+  CP2: [0.03, -0.02, 0.05],
+  CP4: [0.04, -0.03, 0.05],
+  CP6: [0.07, -0.02, 0.03],
+  P7: [-0.08, -0.03, 0.02],
+  P5: [-0.06, -0.04, 0.03],
+  P3: [-0.05, -0.05, 0.04],
+  P1: [-0.03, -0.06, 0.05],
+  PZ: [0.0, -0.05, 0.06],
+  P2: [0.03, -0.06, 0.05],
+  P4: [0.05, -0.05, 0.04],
+  P6: [0.06, -0.04, 0.03],
+  P8: [0.08, -0.03, 0.02],
+  PO7: [-0.06, -0.06, 0.02],
+  PO3: [-0.04, -0.07, 0.03],
+  POZ: [0.0, -0.07, 0.05],
+  PO4: [0.04, -0.07, 0.03],
+  PO8: [0.06, -0.06, 0.02],
+  O1: [-0.03, -0.08, 0.02],
+  OZ: [0.0, -0.08, 0.04],
+  O2: [0.03, -0.08, 0.02],
+  IZ: [0.0, -0.09, 0.01],
+  T3: [-0.08, 0.0, 0.0],
+  T4: [0.08, 0.0, 0.0],
+  T5: [-0.08, -0.03, 0.02],
+  T6: [0.08, -0.03, 0.02],
+  FT7: [-0.08, 0.02, 0.01],
+  FT8: [0.08, 0.02, 0.01],
+  FT9: [-0.09, 0.01, 0.01],
+  FT10: [0.09, 0.01, 0.01],
+  TP7: [-0.08, -0.02, 0.01],
+  TP8: [0.08, -0.02, 0.01],
 };
 
 // Frequency ranges
 const FREQUENCY_BANDS = {
-    'Delta (1-4 Hz)': [1, 4],
-    'Theta (4-8 Hz)': [4, 8], 
-    'Alpha (8-13 Hz)': [8, 13],
-    'Beta (13-40 Hz)': [13, 40]
+  "Delta (1-4 Hz)": [1, 4],
+  "Theta (4-8 Hz)": [4, 8],
+  "Alpha (8-13 Hz)": [8, 13],
+  "Beta (13-40 Hz)": [13, 40],
 };
 
 /**
@@ -63,8 +108,8 @@ function showError(msg) {
  */
 document.addEventListener("DOMContentLoaded", async () => {
   // Wait for DOM to be fully ready
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
   try {
     await initializeViewer();
   } catch (error) {
@@ -152,7 +197,7 @@ async function initializeViewer() {
         document
           .getElementById("showPsdBtn")
           .addEventListener("click", handlePsdToggle);
-        
+
         // Enable topomap functionality
         const multiTopoBtn = document.getElementById("topomapMultiBtn");
         if (multiTopoBtn) {
@@ -160,7 +205,7 @@ async function initializeViewer() {
           // Removed title attribute to prevent tooltip
           multiTopoBtn.onclick = showBandTopomaps;
         }
-        
+
         return;
       } else {
         showError("jsEDF library not loaded.");
@@ -208,7 +253,7 @@ async function initializeViewer() {
       document
         .getElementById("showPsdBtn")
         .addEventListener("click", handlePsdToggle);
-      
+
       // Enable topomap functionality for TXT files too
       const multiTopoBtn = document.getElementById("topomapMultiBtn");
       if (multiTopoBtn) {
@@ -216,7 +261,7 @@ async function initializeViewer() {
         // Removed title attribute to prevent tooltip
         multiTopoBtn.onclick = showBandTopomaps;
       }
-      
+
       return;
     } else {
       showError("No EEG data found in IndexedDB.");
@@ -256,7 +301,7 @@ function parseTxtEEG(text) {
   const header = lines[0];
   let delimiter = ",";
   let maxCols = 0;
-  delims.forEach(d => {
+  delims.forEach((d) => {
     const cols = header.split(d).length;
     if (cols > maxCols) {
       maxCols = cols;
@@ -265,10 +310,21 @@ function parseTxtEEG(text) {
   });
 
   // 3. Column names and select real EEG channels by keyword
-  const headers = header.split(delimiter).map(h => h.trim());
+  const headers = header.split(delimiter).map((h) => h.trim());
   const validKeywords = [
-    "eeg", "exg", "channel", "fp", "fz", "cz", "pz", "oz",
-    "t3", "t4", "t5", "t6", "accel"
+    "eeg",
+    "exg",
+    "channel",
+    "fp",
+    "fz",
+    "cz",
+    "pz",
+    "oz",
+    "t3",
+    "t4",
+    "t5",
+    "t6",
+    "accel",
   ];
   // Remove Timestamp/Sample columns
   const ignoreKeywords = ["timestamp", "sample", "time", "index"];
@@ -276,27 +332,25 @@ function parseTxtEEG(text) {
   // Find EEG channels by keyword; skip ignored columns
   const channelIndexes = headers
     .map((h, idx) =>
-      ignoreKeywords.some(kw => h.toLowerCase().includes(kw))
+      ignoreKeywords.some((kw) => h.toLowerCase().includes(kw))
         ? null
-        : (
-            validKeywords.some(kw => h.toLowerCase().includes(kw)) ||
-            /^[cfoptz]+[0-9]/i.test(h) // e.g. C3, Fp1, O2
-          )
-          ? idx
-          : null
+        : validKeywords.some((kw) => h.toLowerCase().includes(kw)) ||
+          /^[cfoptz]+[0-9]/i.test(h) // e.g. C3, Fp1, O2
+        ? idx
+        : null
     )
-    .filter(idx => idx !== null);
+    .filter((idx) => idx !== null);
 
   // If keyword match fails, fallback to any column that's numeric and not ignored
-  let channel_names = channelIndexes.map(idx => headers[idx]);
+  let channel_names = channelIndexes.map((idx) => headers[idx]);
   if (!channel_names.length) {
     channel_names = headers.filter(
-      (h, idx) => !ignoreKeywords.some(kw => h.toLowerCase().includes(kw))
+      (h, idx) => !ignoreKeywords.some((kw) => h.toLowerCase().includes(kw))
     );
     // Use all columns except ignored if nothing matched
     channelIndexes.length = 0;
     headers.forEach((h, idx) => {
-      if (!ignoreKeywords.some(kw => h.toLowerCase().includes(kw)))
+      if (!ignoreKeywords.some((kw) => h.toLowerCase().includes(kw)))
         channelIndexes.push(idx);
     });
   }
@@ -304,30 +358,30 @@ function parseTxtEEG(text) {
   // 4. Parse data table
   const dataRows = lines
     .slice(1)
-    .map(line =>
+    .map((line) =>
       line
         .split(delimiter)
         .filter((_, idx) => channelIndexes.includes(idx))
-        .map(v => {
+        .map((v) => {
           const x = parseFloat(v);
           // Treat all blank, NaN, Inf as 0.0 (mimic pd.replace)
           return !isFinite(x) ? 0.0 : x;
         })
     )
-    .filter(row => row.length === channel_names.length);
+    .filter((row) => row.length === channel_names.length);
 
   // 5. Limit to first 10 seconds if possible
   const sampleLimit = Math.min(sampleRate * 10, dataRows.length);
   const limitedRows = dataRows.slice(0, sampleLimit);
 
   // 6. Signals shape: channels x samples
-  const signals = channel_names.map((_, i) => limitedRows.map(row => row[i]));
+  const signals = channel_names.map((_, i) => limitedRows.map((row) => row[i]));
 
   return {
     sample_rate: sampleRate,
     channel_names,
     duration: limitedRows.length / sampleRate,
-    signals
+    signals,
   };
 }
 
@@ -414,20 +468,22 @@ freqs_list, psd_list = compute_psd([np.array(sig, dtype=np.float64) for sig in s
 // New function to force hide all topomap containers
 function forceTopoloMapHide() {
   const topomapContainer = document.getElementById("topomapContainer");
-  const multiTopomapContainer = document.getElementById("multiTopomapContainer");
+  const multiTopomapContainer = document.getElementById(
+    "multiTopomapContainer"
+  );
   const mainContainer = document.getElementById("main");
-  
+
   if (topomapContainer) {
     topomapContainer.style.display = "none";
   }
-  
+
   if (multiTopomapContainer) {
     multiTopomapContainer.style.display = "none";
   }
-  
+
   // Remove any topomap-related classes
   mainContainer.classList.remove("psd-with-topomaps");
-  
+
   topomapsVisible = false;
 }
 
@@ -453,18 +509,18 @@ async function handlePsdToggle() {
     timeline.style.display = "none";
     bottomControls.style.display = "none";
     viewToggleBtn.style.display = "none";
-    
+
     if (multiTopoBtn) {
       multiTopoBtn.style.display = "inline-block";
       multiTopoBtn.textContent = "Show Band Topomaps";
     }
-    
+
     psdDiv.style.display = "block";
     psdBtn.textContent = "Back to EEG";
-    
+
     // Add class for coordinated layout
     mainContainer.classList.add("psd-with-topomaps");
-    
+
     const selectedChannels = getSelectedChannels();
     if (!selectedChannels.length) {
       psdDiv.innerHTML = `<div style="padding: 20px; color: red;">Please select at least one channel.</div>`;
@@ -474,11 +530,11 @@ async function handlePsdToggle() {
     await updatePSDPlot(selectedChannels);
     psdVisible = true;
   } else {
-    // Going back to EEG mode - FORCE CLEAN STATE
-    
+    // Going back to EEG mode: force clean state
+
     // Hide ALL topomap containers first
     forceTopoloMapHide();
-    
+
     // Then show EEG components
     plotDiv.style.display = "block";
     timeline.style.display = "block";
@@ -486,23 +542,23 @@ async function handlePsdToggle() {
     viewToggleBtn.style.display = "inline-block";
     psdDiv.style.display = "none";
     psdBtn.textContent = "Show PSD";
-    
+
     // Remove coordinated layout class
     mainContainer.classList.remove("psd-with-topomaps");
-    
+
     // Hide topomap button in EEG mode
     if (multiTopoBtn) {
       multiTopoBtn.style.display = "none";
       multiTopoBtn.textContent = "Show Band Topomaps";
     }
-    
+
     plotCurrentWindow();
     psdVisible = false;
     topomapsVisible = false; // Reset topomap state
-    
+
     fileTitle.style.justifyContent = "space-between";
   }
-  
+
   // Allow new transitions after a brief delay
   setTimeout(() => {
     isTransitioning = false;
@@ -511,14 +567,14 @@ async function handlePsdToggle() {
 
 async function updatePSDPlot(selectedChannels) {
   const psdDiv = document.getElementById("psdPlot");
-  
+
   // Purge existing plot to prevent Plotly errors
-  try { 
-    Plotly.purge("psdPlot"); 
-  } catch (e) { 
+  try {
+    Plotly.purge("psdPlot");
+  } catch (e) {
     // Ignore if no plot exists
   }
-  
+
   psdDiv.innerHTML = "";
   if (!selectedChannels.length) {
     psdDiv.innerHTML = `<div style="padding: 20px; color: red;">Please select at least one channel to compute PSD.</div>`;
@@ -542,17 +598,26 @@ async function updatePSDPlot(selectedChannels) {
     }));
 
     // Calculate appropriate height based on container constraints
-    const isWithTopomaps = document.getElementById("main").classList.contains("psd-with-topomaps");
-    const plotHeight = isWithTopomaps ? Math.min(350, window.innerHeight * 0.35) : 400;
+    const isWithTopomaps = document
+      .getElementById("main")
+      .classList.contains("psd-with-topomaps");
+    const plotHeight = isWithTopomaps
+      ? Math.min(350, window.innerHeight * 0.35)
+      : 400;
 
-    Plotly.newPlot("psdPlot", traces, {
-      title: { text: "Power Spectral Density (PSD)", x: 0.5 },
-      xaxis: { title: "Frequency (Hz)" },
-      yaxis: { title: "Power (dB/Hz)" },
-      height: plotHeight,
-      margin: { l: 60, r: 40, t: 40, b: 60 },
-      showlegend: true,
-    }, {responsive: true});
+    Plotly.newPlot(
+      "psdPlot",
+      traces,
+      {
+        title: { text: "Power Spectral Density (PSD)", x: 0.5 },
+        xaxis: { title: "Frequency (Hz)" },
+        yaxis: { title: "Power (dB/Hz)" },
+        height: plotHeight,
+        margin: { l: 60, r: 40, t: 40, b: 60 },
+        showlegend: true,
+      },
+      { responsive: true }
+    );
   } catch (err) {
     psdDiv.innerHTML = `<div style="padding: 20px; color: red;">PSD Error: ${err.message}</div>`;
   }
@@ -565,7 +630,7 @@ function populateChannelList(channelNames) {
 
   channelNames.forEach((ch) => {
     const label = document.createElement("label");
-    
+
     const input = document.createElement("input");
     input.type = "checkbox";
     input.value = ch;
@@ -576,12 +641,12 @@ function populateChannelList(channelNames) {
         updatePSDPlot(getSelectedChannels());
       }
     });
-    
+
     // Use proper structure with channel-name span for CSS styling
     const channelNameSpan = document.createElement("span");
     channelNameSpan.className = "channel-name";
     channelNameSpan.textContent = ch;
-    
+
     label.appendChild(input);
     label.appendChild(channelNameSpan);
     container.appendChild(label);
@@ -597,14 +662,14 @@ function getSelectedChannels() {
 function plotCurrentWindow() {
   const plotDiv = document.getElementById("plot");
   if (!plotDiv || !eegData || !eegData.signals) return;
-  
+
   // Purge existing plot to prevent Plotly errors
-  try { 
-    Plotly.purge("plot"); 
-  } catch (e) { 
+  try {
+    Plotly.purge("plot");
+  } catch (e) {
     // Ignore if no plot exists
   }
-  
+
   plotDiv.innerHTML = "";
   const selectedChannels = getSelectedChannels();
   if (!selectedChannels.length) {
@@ -650,7 +715,7 @@ function plotCurrentWindow() {
         hovertemplate: `**${ch}**<br>Time: %{x:.2f}s<br>Value: %{y:.2f}<extra></extra>`,
       });
     });
-    Plotly.newPlot("plot", data, layout, {responsive: true});
+    Plotly.newPlot("plot", data, layout, { responsive: true });
   } else {
     // Compact/superimposed
     const data = [];
@@ -670,14 +735,19 @@ function plotCurrentWindow() {
         line: { width: 1 },
       });
     });
-    Plotly.newPlot("plot", data, {
-      title: { text: "EEG Signal (Compact)", x: 0.5 },
-      xaxis: { title: "Time (s)" },
-      yaxis: { title: "Amplitude (µV)" },
-      height: 500,
-      margin: { l: 60, r: 20, t: 40, b: 60 },
-      showlegend: true,
-    }, {responsive: true});
+    Plotly.newPlot(
+      "plot",
+      data,
+      {
+        title: { text: "EEG Signal (Compact)", x: 0.5 },
+        xaxis: { title: "Time (s)" },
+        yaxis: { title: "Amplitude (µV)" },
+        height: 500,
+        margin: { l: 60, r: 20, t: 40, b: 60 },
+        showlegend: true,
+      },
+      { responsive: true }
+    );
   }
 }
 
@@ -699,7 +769,7 @@ function initEEGTimeSlider() {
   window.addEventListener("mouseup", () => (dragging = false));
   window.addEventListener("mousemove", onSliderMouseMove);
   document.addEventListener("keydown", handleKeyNavigation);
-  
+
   // Enhanced resize handler
   let resizeTimeout;
   window.addEventListener("resize", () => {
@@ -720,31 +790,41 @@ function handleResize() {
     sliderCtx.scale(dpr, dpr);
     drawSlider();
   }
-  
+
   // Force Plotly resize for main plots
   setTimeout(() => {
     const plotDiv = document.getElementById("plot");
     const psdDiv = document.getElementById("psdPlot");
-    
+
     if (plotDiv && plotDiv.style.display !== "none") {
       Plotly.Plots.resize("plot");
     }
-    
+
     if (psdDiv && psdDiv.style.display !== "none") {
       // Update PSD plot height based on current layout
-      const isWithTopomaps = document.getElementById("main").classList.contains("psd-with-topomaps");
-      const newHeight = isWithTopomaps ? Math.min(350, window.innerHeight * 0.35) : 400;
-      
+      const isWithTopomaps = document
+        .getElementById("main")
+        .classList.contains("psd-with-topomaps");
+      const newHeight = isWithTopomaps
+        ? Math.min(350, window.innerHeight * 0.35)
+        : 400;
+
       Plotly.relayout("psdPlot", {
-        height: newHeight
+        height: newHeight,
       });
     }
-    
+
     // Resize topomap plots if visible
-    const multiTopomapContainer = document.getElementById("multiTopomapContainer");
-    if (multiTopomapContainer && multiTopomapContainer.style.display !== "none") {
-      const topomapPlots = multiTopomapContainer.querySelectorAll('.topomap-plot');
-      topomapPlots.forEach(plot => {
+    const multiTopomapContainer = document.getElementById(
+      "multiTopomapContainer"
+    );
+    if (
+      multiTopomapContainer &&
+      multiTopomapContainer.style.display !== "none"
+    ) {
+      const topomapPlots =
+        multiTopomapContainer.querySelectorAll(".topomap-plot");
+      topomapPlots.forEach((plot) => {
         if (plot.id) {
           Plotly.Plots.resize(plot.id);
         }
@@ -848,147 +928,215 @@ function handleKeyNavigation(e) {
 
 // Clean channel name function
 function cleanChannelName(chName) {
-    let ch = String(chName).toUpperCase();
-    ch = ch.replace(/EEG\s*/g, "").replace(/REF/g, "").replace(/\./g, "").replace(/\s/g, "").replace(/-/g, "");
-    ch = ch.replace(/_/g, "").replace(/CH/g, "").replace(/CHANNEL/g, "");
-    return ch;
+  let ch = String(chName).toUpperCase();
+  ch = ch
+    .replace(/EEG\s*/g, "")
+    .replace(/REF/g, "")
+    .replace(/\./g, "")
+    .replace(/\s/g, "")
+    .replace(/-/g, "");
+  ch = ch
+    .replace(/_/g, "")
+    .replace(/CH/g, "")
+    .replace(/CHANNEL/g, "");
+  return ch;
 }
 
-// Map channels to standard electrode positions
+// Enhanced channel mapping function - handles more generic channel names
 function mapChannelsToElectrodes(channelNames) {
-    const channelMapping = {};
-    const usedNames = new Set();
-    
-    for (const ch of channelNames) {
-        const cleanCh = cleanChannelName(ch);
-        let bestMatch = null;
-        
-        // Direct match
-        if (cleanCh in ELECTRODE_POSITIONS && !usedNames.has(cleanCh)) {
-            bestMatch = cleanCh;
-        } else {
-            // Handle differential montage (take first electrode)
-            if (ch.includes('-')) {
-                const firstPart = cleanChannelName(ch.split('-')[0]);
-                if (firstPart in ELECTRODE_POSITIONS && !usedNames.has(firstPart)) {
-                    bestMatch = firstPart;
-                }
-            }
-            
-            // Fuzzy matching
-            if (!bestMatch) {
-                for (const standardName of Object.keys(ELECTRODE_POSITIONS)) {
-                    if (!usedNames.has(standardName)) {
-                        if (cleanCh.includes(standardName) || standardName.includes(cleanCh) ||
-                            cleanCh.replace('Z', '') === standardName.replace('Z', '')) {
-                            bestMatch = standardName;
-                            break;
-                        }
-                    }
-                }
-            }
+  const channelMapping = {};
+  const usedNames = new Set();
+
+  for (const ch of channelNames) {
+    const cleanCh = cleanChannelName(ch);
+    let bestMatch = null;
+
+    // Direct match
+    if (cleanCh in ELECTRODE_POSITIONS && !usedNames.has(cleanCh)) {
+      bestMatch = cleanCh;
+    } else {
+      // Handle differential montage (take first electrode)
+      if (ch.includes("-")) {
+        const firstPart = cleanChannelName(ch.split("-")[0]);
+        if (firstPart in ELECTRODE_POSITIONS && !usedNames.has(firstPart)) {
+          bestMatch = firstPart;
         }
-        
-        if (bestMatch) {
-            channelMapping[ch] = bestMatch;
-            usedNames.add(bestMatch);
+      }
+
+      // Enhanced fuzzy matching for generic channel names
+      if (!bestMatch) {
+        // Try to extract electrode name from generic patterns
+        const patterns = [
+          /(?:EEG|EXG|CH|CHANNEL)[\s_-]*([A-Z0-9]+)/i, // "EXG FP1" -> "FP1"
+          /([A-Z]+[0-9]+)/i, // Extract any pattern like "FP1", "C3", etc.
+          /([CFOPTF][0-9Z]+)/i, // Standard electrode patterns
+        ];
+
+        for (const pattern of patterns) {
+          const match = ch.match(pattern);
+          if (match) {
+            const extractedName = cleanChannelName(match[1]);
+            if (
+              extractedName in ELECTRODE_POSITIONS &&
+              !usedNames.has(extractedName)
+            ) {
+              bestMatch = extractedName;
+              break;
+            }
+          }
         }
+
+        // If still no match, try partial matching with existing electrode names
+        if (!bestMatch) {
+          for (const standardName of Object.keys(ELECTRODE_POSITIONS)) {
+            if (!usedNames.has(standardName)) {
+              if (
+                cleanCh.includes(standardName) ||
+                standardName.includes(cleanCh) ||
+                cleanCh.replace("Z", "") === standardName.replace("Z", "")
+              ) {
+                bestMatch = standardName;
+                break;
+              }
+            }
+          }
+        }
+      }
     }
-    
-    return channelMapping;
+
+    if (bestMatch) {
+      channelMapping[ch] = bestMatch;
+      usedNames.add(bestMatch);
+    }
+  }
+
+  return channelMapping;
 }
 
 // Interpolate values for topomap using inverse distance weighting
 function interpolateTopomap(electrodePositions, values, gridSize = 67) {
-    const xMin = -0.12, xMax = 0.12, yMin = -0.12, yMax = 0.12;
-    const xStep = (xMax - xMin) / (gridSize - 1);
-    const yStep = (yMax - yMin) / (gridSize - 1);
-    
-    const x = [], y = [], z = [];
-    const headRadius = 0.095;
-    
-    for (let i = 0; i < gridSize; i++) {
-        for (let j = 0; j < gridSize; j++) {
-            const xi = xMin + i * xStep;
-            const yi = yMin + j * yStep;
-            
-            // Check if point is within head circle
-            const radius = Math.sqrt(xi * xi + yi * yi);
-            if (radius <= headRadius) {
-                let weightedSum = 0;
-                let weightSum = 0;
-                
-                for (let k = 0; k < electrodePositions.length; k++) {
-                    const [ex, ey] = electrodePositions[k];
-                    const distance = Math.sqrt((xi - ex) ** 2 + (yi - ey) ** 2);
-                    
-                    if (distance < 1e-6) {
-                        weightedSum = values[k];
-                        weightSum = 1;
-                        break;
-                    } else {
-                        const weight = 1 / Math.pow(distance, 2.5);
-                        weightedSum += weight * values[k];
-                        weightSum += weight;
-                    }
-                }
-                
-                x.push(xi);
-                y.push(yi);
-                z.push(weightSum > 0 ? weightedSum / weightSum : 0);
-            }
+  const xMin = -0.12,
+    xMax = 0.12,
+    yMin = -0.12,
+    yMax = 0.12;
+  const xStep = (xMax - xMin) / (gridSize - 1);
+  const yStep = (yMax - yMin) / (gridSize - 1);
+
+  const x = [],
+    y = [],
+    z = [];
+  const headRadius = 0.095;
+
+  for (let i = 0; i < gridSize; i++) {
+    for (let j = 0; j < gridSize; j++) {
+      const xi = xMin + i * xStep;
+      const yi = yMin + j * yStep;
+
+      // Check if point is within head circle
+      const radius = Math.sqrt(xi * xi + yi * yi);
+      if (radius <= headRadius) {
+        let weightedSum = 0;
+        let weightSum = 0;
+
+        for (let k = 0; k < electrodePositions.length; k++) {
+          const [ex, ey] = electrodePositions[k];
+          const distance = Math.sqrt((xi - ex) ** 2 + (yi - ey) ** 2);
+
+          if (distance < 1e-6) {
+            weightedSum = values[k];
+            weightSum = 1;
+            break;
+          } else {
+            const weight = 1 / Math.pow(distance, 2.5);
+            weightedSum += weight * values[k];
+            weightSum += weight;
+          }
         }
+
+        x.push(xi);
+        y.push(yi);
+        z.push(weightSum > 0 ? weightedSum / weightSum : 0);
+      }
     }
-    
-    return { x, y, z };
+  }
+
+  return { x, y, z };
 }
 
 // Create head outline
 function createHeadOutline() {
-    const numPoints = 100;
-    const headRadius = 0.095;
-    
-    // Main head circle
-    const headX = [], headY = [];
-    for (let i = 0; i <= numPoints; i++) {
-        const angle = (i / numPoints) * 2 * Math.PI;
-        headX.push(headRadius * Math.cos(angle));
-        headY.push(headRadius * Math.sin(angle));
-    }
-    
-    // Nose (triangle pointing up)
-    const noseX = [0, -0.012, 0.012, 0];
-    const noseY = [headRadius, headRadius + 0.018, headRadius + 0.018, headRadius];
-    
-    // Left ear
-    const leftEarX = [-headRadius, -headRadius - 0.008, -headRadius - 0.008, -headRadius];
-    const leftEarY = [0.025, 0.035, -0.035, -0.025];
-    
-    // Right ear
-    const rightEarX = [headRadius, headRadius + 0.008, headRadius + 0.008, headRadius];
-    const rightEarY = [0.025, 0.035, -0.035, -0.025];
-    
-    return {
-        head: { x: headX, y: headY },
-        nose: { x: noseX, y: noseY },
-        leftEar: { x: leftEarX, y: leftEarY },
-        rightEar: { x: rightEarX, y: rightEarY }
-    };
+  const numPoints = 100;
+  const headRadius = 0.095;
+
+  // Main head circle
+  const headX = [],
+    headY = [];
+  for (let i = 0; i <= numPoints; i++) {
+    const angle = (i / numPoints) * 2 * Math.PI;
+    headX.push(headRadius * Math.cos(angle));
+    headY.push(headRadius * Math.sin(angle));
+  }
+
+  // Nose (triangle pointing up)
+  const noseX = [0, -0.012, 0.012, 0];
+  const noseY = [
+    headRadius,
+    headRadius + 0.018,
+    headRadius + 0.018,
+    headRadius,
+  ];
+
+  // Left ear
+  const leftEarX = [
+    -headRadius,
+    -headRadius - 0.008,
+    -headRadius - 0.008,
+    -headRadius,
+  ];
+  const leftEarY = [0.025, 0.035, -0.035, -0.025];
+
+  // Right ear
+  const rightEarX = [
+    headRadius,
+    headRadius + 0.008,
+    headRadius + 0.008,
+    headRadius,
+  ];
+  const rightEarY = [0.025, 0.035, -0.035, -0.025];
+
+  return {
+    head: { x: headX, y: headY },
+    nose: { x: noseX, y: noseY },
+    leftEar: { x: leftEarX, y: leftEarY },
+    rightEar: { x: rightEarX, y: rightEarY },
+  };
 }
 
-// generateBandTopomaps with matching colors and responsive color bar
+// Fixed generateBandTopomaps with proper error handling
 async function generateBandTopomaps() {
   if (!pythonReady) {
     alert("Python engine not ready yet");
+    // Reset button state on failure
+    const topomapBtn = document.getElementById("topomapMultiBtn");
+    if (topomapBtn) {
+      topomapBtn.textContent = "Show Band Topomaps";
+    }
+    topomapsVisible = false;
     isTransitioning = false;
-    return;
+    return false; // Return false to indicate failure
   }
 
   const selectedChannels = getSelectedChannels();
   if (selectedChannels.length < 3) {
     alert("Need at least 3 channels for topomap");
+    // Reset button state on failure
+    const topomapBtn = document.getElementById("topomapMultiBtn");
+    if (topomapBtn) {
+      topomapBtn.textContent = "Show Band Topomaps";
+    }
+    topomapsVisible = false;
     isTransitioning = false;
-    return;
+    return false;
   }
 
   const channelMapping = mapChannelsToElectrodes(selectedChannels);
@@ -996,10 +1144,24 @@ async function generateBandTopomaps() {
 
   if (mappedChannels.length < 3) {
     alert(
-      `Only ${mappedChannels.length} channels could be mapped to electrode positions. Need at least 3.`
+      `Only ${
+        mappedChannels.length
+      } channels could be mapped to electrode positions. Need at least 3.
+      
+Available channels: ${selectedChannels.join(", ")}
+Mapped channels: ${mappedChannels.join(", ") || "None"}
+
+This file appears to contain non-standard electrode names that cannot be mapped to brain topography.`
     );
+
+    // Reset button state on failure
+    const topomapBtn = document.getElementById("topomapMultiBtn");
+    if (topomapBtn) {
+      topomapBtn.textContent = "Show Band Topomaps";
+    }
+    topomapsVisible = false;
     isTransitioning = false;
-    return;
+    return false;
   }
 
   try {
@@ -1265,25 +1427,39 @@ background: linear-gradient(to top,
         resizeObserver.observe(plotDiv);
       }
     }
+
+    // Reset transition state on success
+    isTransitioning = false;
+    return true; // Return true to indicate success
   } catch (error) {
     alert(`Topomaps generation failed: ${error.message}`);
+
+    // Reset button state on failure
+    const topomapBtn = document.getElementById("topomapMultiBtn");
+    if (topomapBtn) {
+      topomapBtn.textContent = "Show Band Topomaps";
+    }
+    topomapsVisible = false;
     isTransitioning = false;
+    return false;
   }
 }
 
-// showBandTopomaps function with better state management
+// Fixed showBandTopomaps with proper state management
 function showBandTopomaps() {
   // Prevent action if not in PSD mode
   if (!psdVisible) return;
-  
+
   // Prevent rapid clicking
   if (isTransitioning) return;
   isTransitioning = true;
 
-  const multiTopomapContainer = document.getElementById("multiTopomapContainer");
+  const multiTopomapContainer = document.getElementById(
+    "multiTopomapContainer"
+  );
   const mainContainer = document.getElementById("main");
   const topomapBtn = document.getElementById("topomapMultiBtn");
-  
+
   // Toggle topomap visibility
   if (topomapsVisible) {
     // Hide topomaps
@@ -1291,17 +1467,44 @@ function showBandTopomaps() {
     mainContainer.classList.remove("psd-with-topomaps");
     if (topomapBtn) topomapBtn.textContent = "Show Band Topomaps";
     topomapsVisible = false;
+
+    // Allow new transitions
+    setTimeout(() => {
+      isTransitioning = false;
+    }, 100);
   } else {
-    // Show topomaps
-    if (topomapBtn) topomapBtn.textContent = "Hide Topomaps";
-    topomapsVisible = true;
-    generateBandTopomaps();
+    // Try to show topomaps - DON'T change button text yet
+    generateBandTopomaps().then((success) => {
+      if (success) {
+        // Only change button text if topomaps were actually generated
+        if (topomapBtn) topomapBtn.textContent = "Hide Topomaps";
+        topomapsVisible = true;
+      }
+      // isTransitioning is already handled in generateBandTopomaps
+    });
   }
-  
-  // Allow new transitions
-  setTimeout(() => {
-    isTransitioning = false;
-  }, 100);
+}
+
+// New function to force hide all topomap containers
+function forceTopoloMapHide() {
+  const topomapContainer = document.getElementById("topomapContainer");
+  const multiTopomapContainer = document.getElementById(
+    "multiTopomapContainer"
+  );
+  const mainContainer = document.getElementById("main");
+
+  if (topomapContainer) {
+    topomapContainer.style.display = "none";
+  }
+
+  if (multiTopomapContainer) {
+    multiTopomapContainer.style.display = "none";
+  }
+
+  // Remove any topomap-related classes
+  mainContainer.classList.remove("psd-with-topomaps");
+
+  topomapsVisible = false;
 }
 
 function showError(message) {
