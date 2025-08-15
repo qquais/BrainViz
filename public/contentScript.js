@@ -1,4 +1,11 @@
-console.log("EEG Content script starting on:", window.location.href);
+const logger = {
+  info: (msg, ...args) => console.log(`[EEG-CS] ${msg}`, ...args),
+  debug: (msg, ...args) => console.log(`[EEG-CS-DEBUG] ${msg}`, ...args),
+  warn: (msg, ...args) => console.log(`[EEG-CS-WARN] ${msg}`, ...args),
+  error: (msg, ...args) => console.log(`[EEG-CS-ERROR] ${msg}`, ...args)
+};
+
+logger.debug("EEG Content script starting on:", window.location.href);
 
 function isExtensionContextValid() {
   try {
@@ -31,20 +38,24 @@ function containsEEGKeywords(text) {
 }
 
 function isValidEEGText(text) {
-  const lower = text.toLowerCase();
-  if (lower.includes("<html") || lower.includes("<!doctype")) return false;
+  try {
+    const lower = text.toLowerCase();
+    if (lower.includes("<html") || lower.includes("<!doctype")) return false;
 
-  const lines = text.split("\n").filter((line) => line.trim().length > 0);
-  if (lines.length < 10) return false;
+    const lines = text.split("\n").filter((line) => line.trim().length > 0);
+    if (lines.length < 10) return false;
 
-  const avgLineLen =
-    lines.reduce((sum, line) => sum + line.length, 0) / lines.length;
-  if (avgLineLen < 10) return false;
+    const avgLineLen =
+      lines.reduce((sum, line) => sum + line.length, 0) / lines.length;
+    if (avgLineLen < 10) return false;
 
-  const numericRatio = (text.match(/[-\d\.]/g) || []).length / text.length;
-  if (numericRatio < 0.2) return false;
+    const numericRatio = (text.match(/[-\d\.]/g) || []).length / text.length;
+    if (numericRatio < 0.2) return false;
 
-  return containsEEGKeywords(text);
+    return containsEEGKeywords(text);
+  } catch (e) {
+    return false;
+  }
 }
 
 function initializeEEGInterceptor() {
@@ -79,9 +90,16 @@ function initializeEEGInterceptor() {
             filename: fileName,
           },
           (res) => {
-            console.log("Background response:", res);
+            logger.debug("Background response:", res);
+            
+            // Handle different failure reasons gracefully
             if (res?.success === false) {
-              console.warn("Not EEG — allow default browser download:", href);
+              if (res?.reason === "not_eeg") {
+                logger.debug("File validation: Not EEG data, allowing default download:", href);
+              } else {
+                logger.debug("Processing failed, allowing default download:", href);
+              }
+              // Allow default browser download by navigating to the URL
               window.location.href = href;
             }
           }
@@ -90,34 +108,48 @@ function initializeEEGInterceptor() {
       }
 
       if (fileName.endsWith(".txt")) {
-        const response = await fetch(href);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        try {
+          const response = await fetch(href);
+          if (!response.ok) {
+            logger.debug(`HTTP ${response.status} for ${href}`);
+            window.location.href = href;
+            return;
+          }
 
-        const text = await response.text();
-        if (!isValidEEGText(text)) {
+          const text = await response.text();
+          
+          if (!isValidEEGText(text)) {
+            logger.debug("Text validation: Not EEG data, allowing default download:", href);
+            window.location.href = href;
+            return;
+          }
+
+          chrome.runtime.sendMessage(
+            {
+              action: "storeTextEEG",
+              text,
+              filename: fileName,
+            },
+            (res) => {
+              if (res?.success === false) {
+                logger.debug("EEG Viewer failed to open for:", href);
+                window.location.href = href;
+              }
+            }
+          );
+
+          return;
+        } catch (fetchError) {
+          logger.debug("Fetch error for text file:", fetchError.message);
           window.location.href = href;
           return;
         }
-
-        chrome.runtime.sendMessage(
-          {
-            action: "storeTextEEG",
-            text,
-            filename: fileName,
-          },
-          (res) => {
-            if (res?.success === false) {
-              alert("EEG Viewer failed to open.");
-            }
-          }
-        );
-
-        return;
       }
 
       window.location.href = href;
     } catch (err) {
-      alert(`EEG Extension Error: ${err.message}`);
+      logger.debug(`Processing error for ${href}:`, err.message);
+      window.location.href = href;
     }
   });
 }

@@ -8,7 +8,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     eegStorage = new EEGStorage();
     console.log("EEG Storage initialized");
   } catch (error) {
-    console.error("Failed to initialize EEG Storage:", error);
+    console.log("Failed to initialize EEG Storage:", error);
     console.log("Continuing without IndexedDB support");
   }
 
@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   const fileInputArea = document.getElementById("fileInputArea");
 
   if (!fileInput || !fileInputArea) {
-    console.error("UI elements missing");
+    console.log("UI elements missing"); 
     return;
   }
 
@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         await handleTextFileWithValidation(file);
       }
     } catch (error) {
-      console.error("File processing error:", error);
+      console.log("File processing error:", error);
       alert("Error: " + error.message);
     } finally {
       fileInputArea.querySelector(".upload-text").textContent = originalText;
@@ -97,7 +97,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
       return hasEEG && !isLikelyNotEEG;
     } catch (e) {
-      console.error("Error in EDF EEG detection:", e);
+      console.log("Error in EDF EEG detection:", e);
       return false;
     }
   }
@@ -181,7 +181,7 @@ The viewer is specifically designed for EEG signals.`);
       }, 100);
     } catch (error) {
       // Only log actual technical errors, not validation failures
-      console.error("Technical error processing EDF file:", error);
+      console.log("Technical error processing EDF file:", error); 
       alert("Technical error processing file: " + error.message);
     }
   }
@@ -222,7 +222,7 @@ Please ensure your file contains EEG channel data with appropriate headers
       }, 100);
     } catch (error) {
       // Only log actual technical errors, not validation failures
-      console.error("Technical error processing text file:", error);
+      console.log("Technical error processing text file:", error);
       alert("Technical error processing file: " + error.message);
     }
   }
@@ -237,7 +237,7 @@ Please ensure your file contains EEG channel data with appropriate headers
       await loadScript("eegStorage.js");
       console.log("Storage helper loaded");
     } catch (error) {
-      console.warn("Storage helper failed to load:", error);
+      console.log("Storage helper failed to load:", error); 
       throw error;
     }
   }
@@ -266,7 +266,7 @@ Please ensure your file contains EEG channel data with appropriate headers
           await eegStorage.clearAllData();
         }
       } catch (error) {
-        console.error("Error clearing data:", error);
+        console.log("Error clearing data:", error); 
         alert("Error clearing data: " + error.message);
       } finally {
         clearDataBtn.textContent = "Clear stored data";

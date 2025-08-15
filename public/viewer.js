@@ -655,95 +655,262 @@ function getSelectedChannels() {
   ).map((cb) => cb.value);
 }
 
+
 function plotCurrentWindow() {
+  // safety checks
   const plotDiv = document.getElementById("plot");
-  if (!plotDiv || !eegData || !eegData.signals) return;
-
-  // Purge existing plot to prevent Plotly errors
-  try {
-    Plotly.purge("plot");
-  } catch (e) {
-    // Ignore if no plot exists
-  }
-
-  plotDiv.innerHTML = "";
-  const selectedChannels = getSelectedChannels();
-  if (!selectedChannels.length) {
-    plotDiv.innerHTML =
-      "<div style='padding:20px;color:red;'>No channel selected.</div>";
+  if (!plotDiv || !eegData || !eegData.signals) {
+    console.log("[EEG-VIEWER] Plot prerequisites not met");
     return;
   }
-  const start = Math.floor(windowStartSec * sampleRate);
-  const end = start + windowSize * sampleRate;
-  const signals = eegData.signals;
-  const channelNames = eegData.channel_names;
 
-  if (isStackedView) {
-    const data = [];
-    const layout = {
-      title: { text: `EEG Signal (Stacked)`, x: 0.5 },
-      grid: {
-        rows: selectedChannels.length,
-        columns: 1,
-        pattern: "independent",
-      },
-      height: Math.max(selectedChannels.length * 100, 500),
-      margin: { l: 60, r: 20, t: 40, b: 40 },
-      showlegend: false,
-    };
-    selectedChannels.forEach((ch, idx) => {
-      const chIdx = channelNames.indexOf(ch);
-      const signal = signals[chIdx].slice(start, end);
-      const time = Array.from(
-        { length: signal.length },
-        (_, i) => (start + i) / sampleRate
-      );
-      data.push({
-        x: time,
-        y: signal,
-        type: "scatter",
-        mode: "lines",
-        name: ch,
-        xaxis: `x${idx + 1}`,
-        yaxis: `y${idx + 1}`,
-        line: { width: 1 },
-        hoverlabel: { bgcolor: "#eee", font: { size: 11 } },
-        hovertemplate: `**${ch}**<br>Time: %{x:.2f}s<br>Value: %{y:.2f}<extra></extra>`,
+  // Check if DOM is ready and Plotly is loaded
+  if (typeof Plotly === "undefined") {
+    console.log("[EEG-VIEWER] Plotly not ready, retrying...");
+    setTimeout(plotCurrentWindow, 100);
+    return;
+  }
+
+  // DOM readiness check
+  if (!document.body || (!plotDiv.offsetParent && plotDiv.style.display !== 'none' && plotDiv.style.display !== 'block')) {
+    console.log("[EEG-VIEWER] DOM not ready for plotting, retrying...");
+    setTimeout(plotCurrentWindow, 100);
+    return;
+  }
+
+  try {
+    // Plotly purge with better error handling
+    if (plotDiv._plotly_plots && plotDiv._plotly_plots.length > 0) {
+      try {
+        Plotly.purge("plot");
+      } catch (purgeError) {
+        console.log("[EEG-VIEWER] Plotly purge warning:", purgeError.message);
+        // Force clear the plot div if purge fails
+        plotDiv.innerHTML = "";
+        delete plotDiv._plotly_plots;
+      }
+    } else {
+      // Safe cleanup even if no plotly plots exist
+      plotDiv.innerHTML = "";
+    }
+
+    const selectedChannels = getSelectedChannels();
+    if (!selectedChannels.length) {
+      plotDiv.innerHTML = "<div style='padding:20px;color:red;'>No channel selected.</div>";
+      return;
+    }
+
+    // Validate data structure
+    const signals = eegData.signals;
+    const channelNames = eegData.channel_names;
+    
+    if (!signals || !channelNames || signals.length === 0) {
+      plotDiv.innerHTML = "<div style='padding:20px;color:red;'>Invalid EEG data structure.</div>";
+      return;
+    }
+
+    const start = Math.floor(windowStartSec * sampleRate);
+    const end = start + windowSize * sampleRate;
+
+    if (isStackedView) {
+      const data = [];
+      const layout = {
+        title: { text: `EEG Signal (Stacked)`, x: 0.5 },
+        grid: {
+          rows: selectedChannels.length,
+          columns: 1,
+          pattern: "independent",
+        },
+        height: Math.max(selectedChannels.length * 100, 500),
+        margin: { l: 60, r: 20, t: 40, b: 40 },
+        showlegend: false,
+      };
+
+      selectedChannels.forEach((ch, idx) => {
+        const chIdx = channelNames.indexOf(ch);
+        
+        // channel validation
+        if (chIdx === -1) {
+          console.log("[EEG-VIEWER] Warning: Channel not found:", ch);
+          return;
+        }
+        
+        if (!signals[chIdx] || signals[chIdx].length === 0) {
+          console.log("[EEG-VIEWER] Warning: Empty signal for channel:", ch);
+          return;
+        }
+
+        const signal = signals[chIdx].slice(start, end);
+        if (!signal || signal.length === 0) {
+          console.log("[EEG-VIEWER] Warning: No signal data in time window for:", ch);
+          return;
+        }
+
+        const time = Array.from(
+          { length: signal.length },
+          (_, i) => (start + i) / sampleRate
+        );
+
+        data.push({
+          x: time,
+          y: signal,
+          type: "scatter",
+          mode: "lines",
+          name: ch,
+          xaxis: `x${idx + 1}`,
+          yaxis: `y${idx + 1}`,
+          line: { width: 1 },
+          hoverlabel: { bgcolor: "#eee", font: { size: 11 } },
+          hovertemplate: `**${ch}**<br>Time: %{x:.2f}s<br>Value: %{y:.2f}<extra></extra>`,
+        });
       });
-    });
-    Plotly.newPlot("plot", data, layout, { responsive: true });
-  } else {
-    // Compact/superimposed
-    const data = [];
-    selectedChannels.forEach((ch) => {
-      const chIdx = channelNames.indexOf(ch);
-      const signal = signals[chIdx].slice(start, end);
-      const time = Array.from(
-        { length: signal.length },
-        (_, i) => (start + i) / sampleRate
-      );
-      data.push({
-        x: time,
-        y: signal,
-        type: "scatter",
-        mode: "lines",
-        name: ch,
-        line: { width: 1 },
+
+      if (data.length === 0) {
+        plotDiv.innerHTML = "<div style='padding:20px;color:red;'>No valid data to plot.</div>";
+        return;
+      }
+
+      // Safe Plotly plotting with retry
+      safePlotlyCall("plot", data, layout, { responsive: true });
+
+    } else {
+      // COMPACT VIEW 
+      const data = [];
+      
+      selectedChannels.forEach((ch) => {
+        const chIdx = channelNames.indexOf(ch);
+        
+        // channel validation
+        if (chIdx === -1) {
+          console.log("[EEG-VIEWER] Warning: Channel not found:", ch);
+          return;
+        }
+        
+        if (!signals[chIdx] || signals[chIdx].length === 0) {
+          console.log("[EEG-VIEWER] Warning: Empty signal for channel:", ch);
+          return;
+        }
+
+        const signal = signals[chIdx].slice(start, end);
+        if (!signal || signal.length === 0) {
+          console.log("[EEG-VIEWER] Warning: No signal data in time window for:", ch);
+          return;
+        }
+
+        const time = Array.from(
+          { length: signal.length },
+          (_, i) => (start + i) / sampleRate
+        );
+
+        data.push({
+          x: time,
+          y: signal,
+          type: "scatter",
+          mode: "lines",
+          name: ch,
+          line: { width: 1 },
+        });
       });
-    });
-    Plotly.newPlot(
-      "plot",
-      data,
-      {
+
+      if (data.length === 0) {
+        plotDiv.innerHTML = "<div style='padding:20px;color:red;'>No valid data to plot.</div>";
+        return;
+      }
+
+      const layout = {
         title: { text: "EEG Signal (Compact)", x: 0.5 },
         xaxis: { title: "Time (s)" },
         yaxis: { title: "Amplitude (µV)" },
         height: 500,
         margin: { l: 60, r: 20, t: 40, b: 60 },
         showlegend: true,
-      },
-      { responsive: true }
+      };
+
+      // Safe Plotly plotting with retry
+      safePlotlyCall("plot", data, layout, { responsive: true });
+    }
+
+  } catch (error) {
+    console.log("[EEG-VIEWER] Plotting error:", error.message);
+    plotDiv.innerHTML = `<div style='padding:20px;color:red;'>
+      Visualization error: ${error.message}<br>
+      <button onclick="plotCurrentWindow()" style="margin-top:10px;padding:5px 10px;background:#4CAF50;color:white;border:none;border-radius:3px;cursor:pointer;">
+        Retry Plot
+      </button>
+    </div>`;
+  }
+}
+
+// Helper function for safe Plotly calls with retry mechanism
+function safePlotlyCall(elementId, data, layout, config, retryCount = 0) {
+  const maxRetries = 3;
+  
+  try {
+    // Final validation before plotting
+    const element = document.getElementById(elementId);
+    if (!element) {
+      throw new Error(`Plot element '${elementId}' not found`);
+    }
+
+    // Validate data one more time
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      throw new Error("No valid plot data");
+    }
+
+    // Check if any data traces have valid x,y arrays
+    const validTraces = data.filter(trace => 
+      trace.x && trace.y && 
+      Array.isArray(trace.x) && Array.isArray(trace.y) && 
+      trace.x.length > 0 && trace.y.length > 0
     );
+
+    if (validTraces.length === 0) {
+      throw new Error("No traces with valid data");
+    }
+
+    console.log(`[EEG-VIEWER] Plotting ${validTraces.length} traces`);
+
+    // Enhanced Plotly call with better error handling
+    Plotly.newPlot(elementId, validTraces, layout, config).then(() => {
+      console.log("[EEG-VIEWER] Plot rendered successfully");
+    }).catch((plotError) => {
+      console.log("[EEG-VIEWER] Plotly.newPlot promise error:", plotError.message);
+      
+      if (retryCount < maxRetries) {
+        console.log(`[EEG-VIEWER] Retrying plot (${retryCount + 1}/${maxRetries})...`);
+        setTimeout(() => {
+          safePlotlyCall(elementId, data, layout, config, retryCount + 1);
+        }, 300 * (retryCount + 1)); // Increasing delay
+      } else {
+        element.innerHTML = `<div style='padding:20px;color:red;'>
+          Plot failed after ${maxRetries} attempts.<br>
+          Error: ${plotError.message}<br>
+          <button onclick="plotCurrentWindow()" style="margin-top:10px;padding:5px 10px;background:#4CAF50;color:white;border:none;border-radius:3px;cursor:pointer;">
+            Try Again
+          </button>
+        </div>`;
+      }
+    });
+
+  } catch (error) {
+    console.log("[EEG-VIEWER] Safe plot setup error:", error.message);
+    
+    if (retryCount < maxRetries) {
+      console.log(`[EEG-VIEWER] Retrying setup (${retryCount + 1}/${maxRetries})...`);
+      setTimeout(() => {
+        safePlotlyCall(elementId, data, layout, config, retryCount + 1);
+      }, 300 * (retryCount + 1));
+    } else {
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.innerHTML = `<div style='padding:20px;color:red;'>
+          Plot initialization failed: ${error.message}<br>
+          <button onclick="plotCurrentWindow()" style="margin-top:10px;padding:5px 10px;background:#4CAF50;color:white;border:none;border-radius:3px;cursor:pointer;">
+            Retry
+          </button>
+        </div>`;
+      }
+    }
   }
 }
 

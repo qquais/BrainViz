@@ -1,5 +1,14 @@
 importScripts("eegStorage.js");
-console.log("Background script loaded");
+
+// Logger added so that it doesn't generate console errors
+const logger = {
+  info: (msg, ...args) => console.log(`[EEG-BG] ${msg}`, ...args),
+  debug: (msg, ...args) => console.log(`[EEG-BG-DEBUG] ${msg}`, ...args),
+  warn: (msg, ...args) => console.log(`[EEG-BG-WARN] ${msg}`, ...args),
+  error: (msg, ...args) => console.log(`[EEG-BG-ERROR] ${msg}`, ...args)
+};
+
+logger.info("Background script loaded");
 
 function isEEGDownload(url) {
   if (!url) return false;
@@ -38,11 +47,25 @@ function isEEGDownload(url) {
 
 function isValidEEGBuffer(buffer) {
   try {
+    // Basic buffer validation
+    if (!buffer || buffer.byteLength < 256) {
+      return false;
+    }
+
     const header = new TextDecoder().decode(buffer.slice(0, 256));
     const ns = parseInt(header.slice(252, 256).trim());
-    if (isNaN(ns) || ns <= 0) return false;
+    
+    if (isNaN(ns) || ns <= 0) {
+      return false;
+    }
 
-    const signalLabelsRaw = buffer.slice(256, 256 + ns * 16);
+    // Ensure we have enough data for signal labels
+    const expectedLabelSize = 256 + ns * 16;
+    if (buffer.byteLength < expectedLabelSize) {
+      return false;
+    }
+
+    const signalLabelsRaw = buffer.slice(256, expectedLabelSize);
     const signalLabels = new TextDecoder()
       .decode(signalLabelsRaw)
       .toLowerCase();
@@ -75,7 +98,6 @@ function isValidEEGBuffer(buffer) {
 
     return hasEEG && !isLikelyNotEEG;
   } catch (e) {
-    console.error("Error in EDF EEG detection:", e);
     return false;
   }
 }
@@ -96,16 +118,19 @@ chrome.downloads.onCreated.addListener((downloadItem) => {
 async function handleDownload(url) {
   try {
     const response = await fetch(url, { redirect: "follow" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      logger.debug(`HTTP ${response.status} for ${url}`);
+      return;
+    }
 
     const isEDF = url.toLowerCase().endsWith(".edf");
 
     if (isEDF) {
       const arrayBuffer = await response.arrayBuffer();
       if (!isValidEEGBuffer(arrayBuffer)) {
-        console.warn("Not valid EEG (probably ECG)");
+        logger.debug(`File validation: Not EEG data, allowing default download: ${url}`);
         return;
-      }
+      } 
       await chrome.storage.local.clear();
       chrome.storage.local.set(
         {
@@ -121,8 +146,10 @@ async function handleDownload(url) {
       if (
         text.toLowerCase().includes("<html") ||
         text.toLowerCase().includes("<!doctype")
-      )
+      ) {
+        logger.debug(`File appears to be HTML, skipping: ${url}`);
         return;
+      }
 
       await chrome.storage.local.clear();
       chrome.storage.local.set(
@@ -136,7 +163,7 @@ async function handleDownload(url) {
       );
     }
   } catch (error) {
-    console.error("Fetch failed:", error);
+    logger.debug(`Fetch failed for ${url}:`, error.message);
   }
 }
 
@@ -183,12 +210,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       let responded = false;
       try {
         const response = await fetch(msg.url, { redirect: "follow" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          logger.debug(`HTTP ${response.status} for ${msg.url}`);
+          sendResponse({ success: false, error: `HTTP ${response.status}` });
+          responded = true;
+          return;
+        }
 
         const buffer = await response.arrayBuffer();
+        
         if (!isValidEEGBuffer(buffer)) {
-          console.warn("Not valid EEG (probably ECG) — not opening viewer");
-          sendResponse({ success: false });
+          logger.debug(`Validation failed: Not EEG data - ${msg.url}`);
+          sendResponse({ success: false, reason: "not_eeg" });
           responded = true;
           return;
         }
@@ -205,7 +238,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         );
         responded = true;
       } catch (err) {
-        console.error("storeEDFURL error:", err);
+        logger.debug("storeEDFURL error:", err.message);
         if (!responded) {
           sendResponse({ success: false, error: err.message });
         }
