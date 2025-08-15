@@ -63,13 +63,13 @@ key.pem
 *.swo
 
 # Large binary files in libs/ (Pyodide and Python libraries)
-libs/*.whl
-libs/*.tar.gz
-libs/python_stdlib.zip
-libs/openblas-*.zip
-libs/scipy-*.zip
-libs/numpy-*.cp*
-libs/*.wasm
+public/libs/*.whl
+public/libs/*.tar.gz
+public/libs/python_stdlib.zip
+public/libs/openblas-*.zip
+public/libs/scipy-*.zip
+public/libs/numpy-*.cp*
+public/libs/*.wasm
 
 # Pyodide cache and lock files
 libs/pyodide-lock.json
