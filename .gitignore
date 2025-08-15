@@ -70,6 +70,15 @@ public/libs/openblas-*.zip
 public/libs/scipy-*.zip
 public/libs/numpy-*.cp*
 public/libs/*.wasm
+public/libs/pyodide.asm.*
+public/libs/pyodide-lock.json
+
+# But keep essential JS files tracked:
+!public/libs/*.js
+!public/libs/EdfDecoder.js
+!public/libs/jsEDF.js
+!public/libs/plotly.min.js
+!public/libs/pyodide.js
 
 # Pyodide cache and lock files
 libs/pyodide-lock.json
