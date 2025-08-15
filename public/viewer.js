@@ -10,10 +10,8 @@ let sliderCtx = null;
 let dragging = false;
 let windowStartSec = 0;
 let totalDurationSec = 0;
-
-// Add these variables to prevent rapid clicking issues
 let isTransitioning = false; // Prevent rapid clicking issues
-let topomapsVisible = false; // Track topomap state
+let topomapsVisible = false; 
 
 // Electrode positions (10-20 system)
 const ELECTRODE_POSITIONS = {
@@ -145,7 +143,7 @@ async function initializeViewer() {
   if (typeof Plotly === "undefined") throw new Error("Plotly.js not loaded");
   const eegStore = new EEGStorage();
 
-  // --- EDF/BDF first using jsEDF.js ---
+  // --- EDF first using jsEDF.js ---
   const edfDataRec = await eegStore.getEDFFile();
   if (edfDataRec && edfDataRec.data) {
     try {
@@ -198,11 +196,10 @@ async function initializeViewer() {
           .getElementById("showPsdBtn")
           .addEventListener("click", handlePsdToggle);
 
-        // Enable topomap functionality
+        // topomap functionality
         const multiTopoBtn = document.getElementById("topomapMultiBtn");
         if (multiTopoBtn) {
           multiTopoBtn.disabled = false;
-          // Removed title attribute to prevent tooltip
           multiTopoBtn.onclick = showBandTopomaps;
         }
 
@@ -254,11 +251,10 @@ async function initializeViewer() {
         .getElementById("showPsdBtn")
         .addEventListener("click", handlePsdToggle);
 
-      // Enable topomap functionality for TXT files too
+      // Topomap functionality for TXT files too
       const multiTopoBtn = document.getElementById("topomapMultiBtn");
       if (multiTopoBtn) {
         multiTopoBtn.disabled = false;
-        // Removed title attribute to prevent tooltip
         multiTopoBtn.onclick = showBandTopomaps;
       }
 

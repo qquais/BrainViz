@@ -1,0 +1,3 @@
+[submodule "src/jsEDF"]
+	path = src/jsEDF
+	url = https://github.com/Neurobotics/jsEDF

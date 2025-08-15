@@ -1,5 +1,5 @@
 /**
- * EEG Storage Manager - Standalone Version
+ * EEG Storage Manager
  * Handles large file storage using IndexedDB
  */
 
@@ -246,7 +246,7 @@ class EEGStorage {
   }
 }
 
-// Make EEGStorage available globally
+// Making EEGStorage available globally
 if (typeof window !== "undefined") {
   window.EEGStorage = EEGStorage;
 }

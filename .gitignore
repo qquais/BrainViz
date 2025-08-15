@@ -1,5 +1,14 @@
 # macOS system files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # VS Code settings
 .vscode/
@@ -20,6 +29,10 @@ venv/
 # Environment configs
 *.env
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Logs
 *.log
@@ -32,14 +45,55 @@ yarn-error.log*
 
 # Node modules (if added later for bundling)
 node_modules/
+package-lock.json
 
 # Build artifacts (if you zip extension)
 dist/
+build/
 *.zip
 *.crx
 *.pem
+key.pem
 
 # IDE/project configs
 .idea/
 *.sublime-project
 *.sublime-workspace
+*.swp
+*.swo
+
+# Large binary files in libs/ (Pyodide and Python libraries)
+libs/*.whl
+libs/*.tar.gz
+libs/python_stdlib.zip
+libs/openblas-*.zip
+libs/scipy-*.zip
+libs/numpy-*.cp*
+libs/*.wasm
+
+# Pyodide cache and lock files
+libs/pyodide-lock.json
+*.pyc
+
+# EEG data files (can be large)
+*.edf
+*.bdf
+data/
+samples/
+test-data/
+*.csv
+test-files/
+
+# Chrome extension temporary files
+web-ext-artifacts/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Runtime files
+*.pid
+*.seed
+*.pid.lock
