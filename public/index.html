@@ -19,157 +19,247 @@
   Author: EEG Reader Extension Team
 -->
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>EEG Reader Control Panel</title>
-  
+
   <style>
     /* Main container styling - sets popup dimensions and background */
     body {
-      width: 300px;           /* Fixed width for consistent popup size */
-      padding: 15px;          /* Outer padding for content breathing room */
+      width: 300px;
+      /* Fixed width for consistent popup size */
+      padding: 15px;
+      /* Outer padding for content breathing room */
       font-family: Arial, sans-serif;
-      background: #f5f5f5;    /* Light gray background */
-      margin: 0;              /* Remove default browser margins */
+      background: #f5f5f5;
+      /* Light gray background */
+      margin: 0;
+      /* Remove default browser margins */
     }
-    
+
     /* Inner content container with card-like appearance */
     .container {
-      background: white;      /* White card background */
-      padding: 20px;          /* Internal padding for content */
-      border-radius: 8px;     /* Rounded corners for modern look */
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* Subtle shadow for depth */
+      background: white;
+      /* White card background */
+      padding: 20px;
+      /* Internal padding for content */
+      border-radius: 8px;
+      /* Rounded corners for modern look */
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      /* Subtle shadow for depth */
     }
-    
+
     /* Main heading styling */
     h2 {
-      margin: 0 0 15px 0;     /* Remove default margins, add bottom spacing */
-      color: #333;            /* Dark gray text color */
-      font-size: 18px;        /* Readable font size */
+      margin: 0 0 15px 0;
+      /* Remove default margins, add bottom spacing */
+      color: #333;
+      /* Dark gray text color */
+      font-size: 18px;
+      /* Readable font size */
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    
+
+    /* About button in header */
+    .about-btn {
+      background: #666;
+      color: white;
+      border: none;
+      padding: 4px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .about-btn:hover {
+      background: #555;
+    }
+
     /* Control group containers - separate different UI sections */
     .control-group {
-      margin-bottom: 15px;    /* Space between control sections */
-      padding-bottom: 15px;   /* Internal bottom padding */
-      border-bottom: 1px solid #eee; /* Subtle separator line */
+      margin-bottom: 15px;
+      /* Space between control sections */
+      padding-bottom: 15px;
+      /* Internal bottom padding */
+      border-bottom: 1px solid #eee;
+      /* Subtle separator line */
     }
-    
+
     /* Remove border from last control group for clean appearance */
     .control-group:last-child {
       border-bottom: none;
       margin-bottom: 0;
     }
-    
+
     /* Container for toggle switch and label */
     .toggle-container {
-      display: flex;          /* Flexbox for easy alignment */
-      align-items: center;    /* Vertically center items */
-      justify-content: space-between; /* Space between label and toggle */
-      margin-bottom: 10px;    /* Space below toggle row */
+      display: flex;
+      /* Flexbox for easy alignment */
+      align-items: center;
+      /* Vertically center items */
+      justify-content: space-between;
+      /* Space between label and toggle */
+      margin-bottom: 10px;
+      /* Space below toggle row */
     }
-    
+
     /* Custom toggle switch styling */
     .toggle-switch {
-      position: relative;     /* For absolute positioning of knob */
-      width: 50px;           /* Switch track width */
-      height: 24px;          /* Switch track height */
-      background: #ccc;      /* Default gray background */
-      border-radius: 12px;   /* Rounded ends for pill shape */
-      cursor: pointer;       /* Show clickable cursor */
-      transition: background 0.3s; /* Smooth color transition */
+      position: relative;
+      /* For absolute positioning of knob */
+      width: 50px;
+      /* Switch track width */
+      height: 24px;
+      /* Switch track height */
+      background: #ccc;
+      /* Default gray background */
+      border-radius: 12px;
+      /* Rounded ends for pill shape */
+      cursor: pointer;
+      /* Show clickable cursor */
+      transition: background 0.3s;
+      /* Smooth color transition */
     }
-    
+
     /* Active state for toggle switch - green when enabled */
     .toggle-switch.active {
-      background: #4CAF50;   /* Green background when active */
+      background: #4CAF50;
+      /* Green background when active */
     }
-    
+
     /* Toggle switch knob (the sliding circle) */
     .toggle-knob {
-      position: absolute;    /* Absolute positioning within switch */
-      top: 2px;             /* Slight top offset for visual balance */
-      left: 2px;            /* Default left position */
-      width: 20px;          /* Knob diameter */
-      height: 20px;         /* Knob diameter */
-      background: white;     /* White knob color */
-      border-radius: 50%;    /* Perfect circle */
-      transition: transform 0.3s; /* Smooth sliding animation */
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2); /* Shadow for depth */
+      position: absolute;
+      /* Absolute positioning within switch */
+      top: 2px;
+      /* Slight top offset for visual balance */
+      left: 2px;
+      /* Default left position */
+      width: 20px;
+      /* Knob diameter */
+      height: 20px;
+      /* Knob diameter */
+      background: white;
+      /* White knob color */
+      border-radius: 50%;
+      /* Perfect circle */
+      transition: transform 0.3s;
+      /* Smooth sliding animation */
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      /* Shadow for depth */
     }
-    
+
     /* Knob position when toggle is active - slides to right */
     .toggle-switch.active .toggle-knob {
-      transform: translateX(26px); /* Move right when active */
+      transform: translateX(26px);
+      /* Move right when active */
     }
-    
+
     /* Status text styling */
     .status {
-      font-size: 12px;       /* Smaller text for status info */
-      color: #666;           /* Gray text color */
-      margin-top: 5px;       /* Space above status text */
+      font-size: 12px;
+      /* Smaller text for status info */
+      color: #666;
+      /* Gray text color */
+      margin-top: 5px;
+      /* Space above status text */
     }
-    
+
     /* File upload drop area styling */
     .file-input-area {
-      border: 2px dashed #ddd;    /* Dashed border for drop zone feel */
-      border-radius: 6px;         /* Rounded corners */
-      padding: 20px;              /* Generous padding for click target */
-      text-align: center;         /* Center the upload text */
-      background: #fafafa;        /* Very light gray background */
-      cursor: pointer;            /* Show clickable cursor */
-      transition: border-color 0.3s; /* Smooth border color change */
+      border: 2px dashed #ddd;
+      /* Dashed border for drop zone feel */
+      border-radius: 6px;
+      /* Rounded corners */
+      padding: 20px;
+      /* Generous padding for click target */
+      text-align: center;
+      /* Center the upload text */
+      background: #fafafa;
+      /* Very light gray background */
+      cursor: pointer;
+      /* Show clickable cursor */
+      transition: border-color 0.3s;
+      /* Smooth border color change */
     }
-    
+
     /* Hover effect for file upload area */
     .file-input-area:hover {
-      border-color: #4CAF50;      /* Green border on hover */
+      border-color: #4CAF50;
+      /* Green border on hover */
     }
-    
+
     /* Hide the actual file input (replaced by custom upload area) */
     #fileInput {
       display: none;
     }
-    
+
     /* Upload area text styling */
     .upload-text {
-      color: #666;           /* Gray text color */
-      font-size: 14px;       /* Readable font size */
+      color: #666;
+      /* Gray text color */
+      font-size: 14px;
+      /* Readable font size */
     }
-    
+
     /* Button styling for consistent appearance */
     .btn {
-      background: #4CAF50;   /* Green background */
-      color: white;          /* White text */
-      border: none;          /* Remove default border */
-      padding: 8px 16px;     /* Comfortable padding */
-      border-radius: 4px;    /* Slightly rounded corners */
-      cursor: pointer;       /* Show clickable cursor */
-      font-size: 12px;       /* Readable font size */
-      margin-top: 10px;      /* Space above button */
-      width: 100%;           /* Full width within container */
+      background: #4CAF50;
+      /* Green background */
+      color: white;
+      /* White text */
+      border: none;
+      /* Remove default border */
+      padding: 8px 16px;
+      /* Comfortable padding */
+      border-radius: 4px;
+      /* Slightly rounded corners */
+      cursor: pointer;
+      /* Show clickable cursor */
+      font-size: 12px;
+      /* Readable font size */
+      margin-top: 10px;
+      /* Space above button */
+      width: 100%;
+      /* Full width within container */
     }
-    
+
     /* Button hover effect */
     .btn:hover {
-      background: #45a049;   /* Darker green on hover */
+      background: #45a049;
+      /* Darker green on hover */
     }
-    
+
     /* Info text styling for help text and descriptions */
     .info {
-      font-size: 11px;       /* Small font for secondary info */
-      color: #888;           /* Light gray text */
-      margin-top: 8px;       /* Space above info text */
-      line-height: 1.4;      /* Comfortable line spacing */
+      font-size: 11px;
+      /* Small font for secondary info */
+      color: #888;
+      /* Light gray text */
+      margin-top: 8px;
+      /* Space above info text */
+      line-height: 1.4;
+      /* Comfortable line spacing */
     }
   </style>
 </head>
+
 <body>
   <!-- Main container for all popup content -->
   <div class="container">
     <!-- Popup title with brain emoji for visual appeal -->
-    <h2>🧠 EEG Reader</h2>
-    
+    <h2>
+      🧠 BrainViz
+      <a href="#" class="about-btn" id="aboutBtn">ℹ️ About</a>
+    </h2>
+
     <!-- Control group for download interception toggle -->
     <div class="control-group">
       <!-- Toggle switch container with label and switch -->
@@ -203,4 +293,5 @@
   <!-- JavaScript file that handles all popup functionality -->
   <script src="popup.js"></script>
 </body>
+
 </html>

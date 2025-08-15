@@ -3,6 +3,15 @@ let eegStorage = null;
 document.addEventListener("DOMContentLoaded", async function () {
   console.log("Popup loaded - Debug Version");
 
+  // About button handler
+  const aboutBtn = document.getElementById("aboutBtn");
+  if (aboutBtn) {
+    aboutBtn.addEventListener("click", function (e) {
+      e.preventDefault();
+      chrome.tabs.create({ url: chrome.runtime.getURL("about.html") });
+    });
+  }
+
   try {
     await loadStorageHelper();
     eegStorage = new EEGStorage();
@@ -16,7 +25,7 @@ document.addEventListener("DOMContentLoaded", async function () {
   const fileInputArea = document.getElementById("fileInputArea");
 
   if (!fileInput || !fileInputArea) {
-    console.log("UI elements missing"); 
+    console.log("UI elements missing");
     return;
   }
 
@@ -181,7 +190,7 @@ The viewer is specifically designed for EEG signals.`);
       }, 100);
     } catch (error) {
       // Only log actual technical errors, not validation failures
-      console.log("Technical error processing EDF file:", error); 
+      console.log("Technical error processing EDF file:", error);
       alert("Technical error processing file: " + error.message);
     }
   }
@@ -237,7 +246,7 @@ Please ensure your file contains EEG channel data with appropriate headers
       await loadScript("eegStorage.js");
       console.log("Storage helper loaded");
     } catch (error) {
-      console.log("Storage helper failed to load:", error); 
+      console.log("Storage helper failed to load:", error);
       throw error;
     }
   }
@@ -266,7 +275,7 @@ Please ensure your file contains EEG channel data with appropriate headers
           await eegStorage.clearAllData();
         }
       } catch (error) {
-        console.log("Error clearing data:", error); 
+        console.log("Error clearing data:", error);
         alert("Error clearing data: " + error.message);
       } finally {
         clearDataBtn.textContent = "Clear stored data";

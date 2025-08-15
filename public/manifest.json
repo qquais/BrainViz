@@ -34,6 +34,7 @@
         "libs/openblas-0.3.23.zip",
         "eegStorage.js",
         "viewer.html",
+        "about.html",
         "scriptInjector.js"
       ],
       "matches": ["<all_urls>"]
