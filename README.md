@@ -201,12 +201,3 @@ This extension processes EEG files locally in your browser using client-side Pyt
 
 * [Link](https://www.youtube.com/shorts/jqH67MbXUoo)
 
----
-
-**Version**: 1.0.1
-
-**Manifest**: v3
-
-**Minimum Chrome Version**: 88+
-
-**Python Runtime**: Pyodide (client-side)
